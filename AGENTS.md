@@ -33,9 +33,10 @@ docker compose up --build               # sobe tudo
 1. Pegar a próxima tarefa `[ ]` de `TASKS.md` com dependências concluídas e marcá-la `[~]`.
 2. Grill (`grill-with-docs`): confrontar com PRD/ASSUMPTIONS/DECISIONS; resolver ou registrar ambiguidades.
 3. Implementar (teste primeiro para regras em `packages/shared`).
-4. Validar com os comandos da tarefa.
+4. Validar com os comandos da seção _Validação_ da tarefa e com a _Validação manual_ (artefato real).
 5. Atualizar docs tocados e o status/progresso em `TASKS.md`.
 6. Propor a mensagem de commit ao autor; **nunca** commitar sem aprovação.
+7. Antes de abrir o PR, colar na descrição os comandos/saídas (ou screenshots) da validação manual como evidência.
 
 ## Commits (obrigatório)
 
