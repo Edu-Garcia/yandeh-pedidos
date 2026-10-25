@@ -25,7 +25,7 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 
 | Fase                              | Tarefas | `[x]` |
 | --------------------------------- | ------- | ----- |
-| F0 — Base (scaffold + docs)       | 1       | 0     |
+| F0 — Base (scaffold + docs)       | 1       | 1     |
 | F1 — Regras puras (`shared`)      | 9       | 0     |
 | F2 — Banco e seed                 | 1       | 0     |
 | F3 — API (req. 1–5, 7)            | 6       | 0     |
@@ -34,7 +34,7 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | F6 — Supervisor (fecha req. 5)    | 2       | 0     |
 | F7 — Offline parcial (req. 9)     | 2       | 0     |
 | F8 — Entrega e docs               | 4       | 0     |
-| **Total**                         | **32**  | **0** |
+| **Total**                         | **32**  | **1** |
 | Opcionais                         | 3       | 0     |
 
 > Sem estimativas de tempo: com IA acelerando a implementação, elas não refletem dados reais. Prioridade: núcleo (F1–F4 + F8, req. 1–7) primeiro. Se o prazo apertar, corte na ordem: opcionais → F7 → F6 (T-25) → F5, e registre em README "o que ficou de fora".
@@ -45,7 +45,7 @@ Mensagens de commit: obrigatoriamente [Conventional Commits](https://www.convent
 
 ## F0 — Base
 
-### [ ] T-00 — Commit inicial do scaffold e docs
+### [x] T-00 — Commit inicial do scaffold e docs
 
 - **Refs:** PRD §13 bloco 0; entregável "histórico real".
 - **Depende de:** —
@@ -54,8 +54,8 @@ Mensagens de commit: obrigatoriamente [Conventional Commits](https://www.convent
 - **Aceite:** `.ai-private/` não entra (gitignored); `docker compose up --build` sobe e `GET /health` → `{"status":"ok"}`.
 - **Validação:** `git status --ignored | grep .ai-private`; `pnpm install && pnpm typecheck && pnpm lint && pnpm format:check && pnpm test`; `curl localhost:3333/health`.
 - **Docs:** —
-- **Commit:** `chore: scaffold do monorepo, docker, schema/seed e docs iniciais` + `IA: ...`
-- **Status:** feito (aguardando aprovação do autor)
+- **Commit:** `chore: estrutura inicial, PRD e documentação do desafio` + `IA: majoritária` (`607ef9f`)
+- **Status:** feito, commit `607ef9f` aprovado pelo autor
 
 ## F1 — Regras puras em `packages/shared` (req. 6)
 

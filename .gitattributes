@@ -1,0 +1,6 @@
+# Normaliza quebras de linha para LF (Docker/Linux e .editorconfig)
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.pdf binary
