@@ -30,7 +30,7 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | Fase                              | Tarefas | `[x]` |
 | --------------------------------- | ------- | ----- |
 | F0 — Base (scaffold + docs)       | 1       | 1     |
-| F1 — Regras puras (`shared`)      | 9       | 0     |
+| F1 — Regras puras (`shared`)      | 9       | 1     |
 | F2 — Banco e seed                 | 1       | 0     |
 | F3 — API (req. 1–5, 7)            | 6       | 0     |
 | F4 — Telas (req. 1–5, 7)          | 5       | 0     |
@@ -38,7 +38,7 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | F6 — Supervisor (fecha req. 5)    | 2       | 0     |
 | F7 — Offline parcial (req. 9)     | 2       | 0     |
 | F8 — Entrega e docs               | 4       | 0     |
-| **Total**                         | **32**  | **1** |
+| **Total**                         | **32**  | **2** |
 | Opcionais                         | 3       | 0     |
 
 > Sem estimativas de tempo: com IA acelerando a implementação, elas não refletem dados reais. Prioridade: núcleo (F1–F4 + F8, req. 1–7) primeiro. Se o prazo apertar, corte na ordem: opcionais → F7 → F6 (T-25) → F5, e registre em README "o que ficou de fora".
@@ -68,7 +68,7 @@ Validação comum: `pnpm --filter @yandeh/shared test` (e `pnpm --filter @yandeh
 
 Consumir `@yandeh/shared` hoje exige `pnpm --filter @yandeh/shared build` antes: os `exports` do pacote apontam para `dist/`. O script tsx temporário de cada tarefa desta fase deve viver em `apps/api/` (consumidor) e ser rodado com `pnpm --filter @yandeh/api exec tsx ./_tmp.ts`.
 
-### [ ] T-01 — Dinheiro em centavos (`toCents`, `formatBRL`)
+### [x] T-01 — Dinheiro em centavos (`toCents`, `formatBRL`)
 
 - **Refs:** PRD §6 intro, RN07; D8; A14.
 - **Depende de:** T-00
