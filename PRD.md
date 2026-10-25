@@ -78,7 +78,7 @@ _Exemplo:_ V01 vê C001–C004; V02 vê C005–C007; V03 vê C008–C010.
 
 ### RN02 — Tabela de preço efetiva [Decisão do autor]
 
-`tabela = cliente.tabela_preco_id ?? 'TP01'`. Quando o fallback é usado, a UI exibe aviso claro ("Cliente sem tabela — usando Tabela Padrão").
+Tabela vazia ou nula → TP01. `tabela = trim(cliente.tabela_preco_id)` se houver texto; id nulo, `''` ou só espaços usa `'TP01'` com fallback. Quando o fallback é usado, a UI exibe aviso claro ("Cliente sem tabela — usando Tabela Padrão").
 _Exemplo:_ C004 (Mercearia Dona Lúcia) não tem tabela → TP01. Trade-off aceito: risco de preço errado.
 
 > **Nota:** Num cenário real, refinaria essa regra com o PO; no teste técnico não há esse canal, então fica registrada aqui e em `DECISIONS.md` (D11, "Com mais tempo").

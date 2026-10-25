@@ -3,14 +3,14 @@ import { FALLBACK_PRICE_TABLE_ID } from './rules'
 
 /**
  * Tabela efetiva do cliente (RN02 / D11 / A2).
- * `tabela = cliente.tabela_preco_id ?? 'TP01'`. `isFallback` só quando o id é nulo.
+ * Id nulo, vazio ou só espaços → TP01. `isFallback` indica que o fallback foi usado.
  */
 export function resolvePriceTableId(customer: Pick<Customer, 'priceTableId'>): EffectivePriceTable {
-  const isFallback = customer.priceTableId == null
-  return {
-    tableId: customer.priceTableId ?? FALLBACK_PRICE_TABLE_ID,
-    isFallback,
+  const raw = customer.priceTableId
+  if (raw == null || raw.trim() === '') {
+    return { tableId: FALLBACK_PRICE_TABLE_ID, isFallback: true }
   }
+  return { tableId: raw, isFallback: false }
 }
 
 /**

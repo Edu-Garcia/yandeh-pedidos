@@ -54,12 +54,15 @@ describe('resolvePriceTableId', () => {
     })
   })
 
-  it('string vazia não dispara o fallback (RN02 usa ??)', () => {
-    expect(resolvePriceTableId({ priceTableId: '' })).toEqual({
-      tableId: '',
-      isFallback: false,
-    })
-  })
+  it.each([null, '', '   '] as const)(
+    '%j (nulo, vazio ou só espaços) usa TP01 com fallback',
+    (priceTableId) => {
+      expect(resolvePriceTableId({ priceTableId })).toEqual({
+        tableId: FALLBACK_PRICE_TABLE_ID,
+        isFallback: true,
+      })
+    },
+  )
 })
 
 describe('unitPriceFor', () => {
