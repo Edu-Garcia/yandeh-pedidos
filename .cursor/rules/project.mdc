@@ -1,0 +1,12 @@
+---
+description: Regras gerais do projeto Yandeh (sempre aplicadas)
+globs:
+alwaysApply: true
+---
+- Leia `AGENTS.md` e `PRD.md` antes de mudanças relevantes.
+- Docs e textos de UI em pt-BR; código em inglês.
+- Dinheiro em centavos inteiros; quantidades em unidades.
+- Regras de negócio só em `packages/shared` (funções puras e testadas).
+- `apps/api/seed/seed.json` é usado como está: nunca editar.
+- Commits: sem squash; última linha `IA: nenhuma` | `IA: parcial` | `IA: majoritária`. Não commitar sem pedido.
+- Registrar prompts do usuário em `.ai-private/PROMPTS.md`; atualizar DECISIONS/ASSUMPTIONS/README quando algo mudar.

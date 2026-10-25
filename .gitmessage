@@ -1,0 +1,9 @@
+# Conventional Commits: <tipo>(<escopo>): <descrição no imperativo, até ~72 caracteres>
+# tipos: feat | fix | test | refactor | docs | chore | build | ci | style | perf
+#
+# Por quê / o que mudou (opcional)
+#
+# Última linha OBRIGATÓRIA — escolha UMA e apague as outras:
+IA: nenhuma
+IA: parcial
+IA: majoritária

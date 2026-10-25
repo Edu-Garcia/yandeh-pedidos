@@ -1,0 +1,11 @@
+---
+description: Convenções do frontend (Vue 3 + Tailwind)
+globs: apps/web/**
+alwaysApply: false
+---
+- Vue 3 `<script setup lang="ts">`, Pinia para estado, Vue Router para páginas em `src/pages`.
+- Tailwind v4; mobile-first, alvos de toque grandes; use a skill `frontend-design`.
+- Cálculos e validações via `@yandeh/shared` (nunca reimplementar regra no componente).
+- Formatar BRL com `Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })` a partir de centavos.
+- Rascunho do pedido persistido localmente; envio com `Idempotency-Key` e retentativa.
+- Mostrar motivos de bloqueio de envio e avisos (fallback TP01, aprovação necessária).

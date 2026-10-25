@@ -1,0 +1,10 @@
+---
+description: Regras de negócio puras em packages/shared
+globs: packages/shared/**
+alwaysApply: false
+---
+- Somente funções puras, sem I/O, sem dependências de framework.
+- Valores monetários em centavos (`Cents`), quantidades em unidades.
+- Testes primeiro (Vitest), usando números reais do seed (ver exemplos no PRD §6).
+- Cada regra referencia seu código no PRD (RN01–RN13).
+- Mudou uma regra? Atualizar PRD, DECISIONS/ASSUMPTIONS e os testes.

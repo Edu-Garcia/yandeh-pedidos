@@ -1,0 +1,11 @@
+---
+description: Convenções da API (Fastify + Zod + Drizzle)
+globs: apps/api/**
+alwaysApply: false
+---
+- Fastify com `buildApp()` em `src/app.ts`; testes de rota com `app.inject` (Vitest).
+- Validar entrada com Zod; responder 422 com `ValidationIssue[]` do `@yandeh/shared` para violações de regra.
+- Revalidar todas as regras no servidor (a API é a autoridade).
+- Envio de pedido em transação com `SELECT ... FOR UPDATE` no cliente (crédito) e `Idempotency-Key` única.
+- Mudou `src/db/schema.ts`? Rodar `pnpm --filter @yandeh/api db:generate` e versionar a migração.
+- Seed idempotente (`onConflictDoNothing`); conversão reais→centavos com `Math.round(x * 100)`.

@@ -1,0 +1,167 @@
+import { readFile } from 'node:fs/promises'
+import { fileURLToPath } from 'node:url'
+import { db, pool } from './client.js'
+import {
+  clientes,
+  pedidos,
+  pedidosItens,
+  produtos,
+  supervisores,
+  tabelasPreco,
+  tabelasPrecoItens,
+  vendedores,
+} from './schema.js'
+
+// Carrega seed/seed.json COMO ESTÁ. Idempotente: ON CONFLICT DO NOTHING.
+// Única transformação: reais -> centavos inteiros (Math.round(valor * 100)).
+
+const seedPath = fileURLToPath(new URL('../../seed/seed.json', import.meta.url))
+const toCents = (reais: number) => Math.round(reais * 100)
+
+interface Seed {
+  supervisores: { id: string; nome: string }[]
+  vendedores: {
+    id: string
+    nome: string
+    supervisor_id: string
+    alcada_desconto_percentual: number
+  }[]
+  clientes: {
+    id: string
+    nome_fantasia: string
+    razao_social: string
+    cnpj: string
+    vendedor_id: string
+    tabela_preco_id: string | null
+    limite_credito: number
+    credito_utilizado: number
+    cidade: string
+    uf: string
+  }[]
+  produtos: {
+    id: string
+    sku: string
+    ean: string
+    descricao: string
+    categoria: string
+    marca: string
+    unidade_venda: string
+    fator_embalagem: number
+    venda_somente_multiplo: boolean
+    ativo: boolean
+  }[]
+  tabelas_preco: {
+    id: string
+    nome: string
+    itens: { produto_id: string; preco_unidade: number }[]
+  }[]
+  pedidos_historico: {
+    id: string
+    cliente_id: string
+    vendedor_id: string
+    data: string
+    status: string
+    itens: {
+      produto_id: string
+      quantidade: number
+      preco_unidade: number
+      desconto_percentual: number
+    }[]
+  }[]
+}
+
+const seed = JSON.parse(await readFile(seedPath, 'utf8')) as Seed
+
+await db.transaction(async (tx) => {
+  await tx.insert(supervisores).values(seed.supervisores).onConflictDoNothing()
+  await tx
+    .insert(vendedores)
+    .values(
+      seed.vendedores.map((v) => ({
+        id: v.id,
+        nome: v.nome,
+        supervisorId: v.supervisor_id,
+        alcadaDescontoPercentual: v.alcada_desconto_percentual,
+      })),
+    )
+    .onConflictDoNothing()
+  await tx
+    .insert(tabelasPreco)
+    .values(seed.tabelas_preco.map((t) => ({ id: t.id, nome: t.nome })))
+    .onConflictDoNothing()
+  await tx
+    .insert(clientes)
+    .values(
+      seed.clientes.map((c) => ({
+        id: c.id,
+        nomeFantasia: c.nome_fantasia,
+        razaoSocial: c.razao_social,
+        cnpj: c.cnpj,
+        vendedorId: c.vendedor_id,
+        tabelaPrecoId: c.tabela_preco_id,
+        limiteCreditoCentavos: toCents(c.limite_credito),
+        creditoUtilizadoCentavos: toCents(c.credito_utilizado),
+        cidade: c.cidade,
+        uf: c.uf,
+      })),
+    )
+    .onConflictDoNothing()
+  await tx
+    .insert(produtos)
+    .values(
+      seed.produtos.map((p) => ({
+        id: p.id,
+        sku: p.sku,
+        ean: p.ean,
+        descricao: p.descricao,
+        categoria: p.categoria,
+        marca: p.marca,
+        unidadeVenda: p.unidade_venda,
+        fatorEmbalagem: p.fator_embalagem,
+        vendaSomenteMultiplo: p.venda_somente_multiplo,
+        ativo: p.ativo,
+      })),
+    )
+    .onConflictDoNothing()
+  await tx
+    .insert(tabelasPrecoItens)
+    .values(
+      seed.tabelas_preco.flatMap((t) =>
+        t.itens.map((i) => ({
+          tabelaPrecoId: t.id,
+          produtoId: i.produto_id,
+          precoUnidadeCentavos: toCents(i.preco_unidade),
+        })),
+      ),
+    )
+    .onConflictDoNothing()
+  await tx
+    .insert(pedidos)
+    .values(
+      seed.pedidos_historico.map((p) => ({
+        id: p.id,
+        clienteId: p.cliente_id,
+        vendedorId: p.vendedor_id,
+        data: p.data,
+        status: p.status,
+      })),
+    )
+    .onConflictDoNothing()
+  await tx
+    .insert(pedidosItens)
+    .values(
+      seed.pedidos_historico.flatMap((p) =>
+        p.itens.map((i) => ({
+          pedidoId: p.id,
+          produtoId: i.produto_id,
+          quantidade: i.quantidade,
+          precoUnidadeCentavos: toCents(i.preco_unidade),
+          descontoPercentual: i.desconto_percentual,
+        })),
+      ),
+    )
+    .onConflictDoNothing()
+})
+
+console.log('[seed] ok')
+await pool.end()

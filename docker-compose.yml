@@ -1,0 +1,43 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-yandeh}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-yandeh}
+      POSTGRES_DB: ${POSTGRES_DB:-yandeh}
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-yandeh}:${POSTGRES_PASSWORD:-yandeh}@postgres:5432/${POSTGRES_DB:-yandeh}
+      API_PORT: 3333
+    ports:
+      - '${API_PORT:-3333}:3333'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3333}
+    ports:
+      - '${WEB_PORT:-5173}:80'
+    depends_on:
+      - api
+
+volumes:
+  pgdata:

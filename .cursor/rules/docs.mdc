@@ -1,0 +1,10 @@
+---
+description: Manutenção dos documentos do desafio
+globs: "*.md"
+alwaysApply: false
+---
+- Documentos em pt-BR, objetivos.
+- DECISIONS.md: contexto, alternativas, escolha, por quê, o que faria diferente.
+- ASSUMPTIONS.md: ambiguidade + interpretação (+ resposta da empresa, se houver).
+- AI_LOG.md: 3–5 momentos, ao menos um erro da IA, e mapa de autoria — conteúdo é do autor; a IA só propõe rascunhos marcados.
+- README.md: como rodar, como testar, o que ficou de fora.
