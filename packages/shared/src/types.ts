@@ -33,6 +33,19 @@ export interface Customer {
   creditUsed: Cents
 }
 
+/** Item de preço já em centavos (espelha `tabelas_preco_itens`). */
+export interface PriceItem {
+  productId: string
+  priceTableId: string
+  unitPrice: Cents
+}
+
+/** Resultado de RN02: tabela do cliente ou TP01 com flag de fallback. */
+export interface EffectivePriceTable {
+  tableId: string
+  isFallback: boolean
+}
+
 export interface OrderLineInput {
   productId: string
   /** Quantidade SEMPRE em unidades. */

@@ -19,11 +19,6 @@ const notImplemented = (name: string): never => {
   throw new Error(`${name}: não implementado`)
 }
 
-/** Tabela efetiva do cliente (fallback TP01 quando nula). */
-export function resolvePriceTableId(_customer: Pick<Customer, 'priceTableId'>): string {
-  return notImplemented('resolvePriceTableId')
-}
-
 /** Quantidade em unidades é válida para o produto (múltiplo da embalagem quando exigido)? */
 export function isValidQuantity(_product: Product, _quantityUnits: number): boolean {
   return notImplemented('isValidQuantity')

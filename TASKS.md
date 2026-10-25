@@ -30,7 +30,7 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | Fase                              | Tarefas | `[x]` |
 | --------------------------------- | ------- | ----- |
 | F0 — Base (scaffold + docs)       | 1       | 1     |
-| F1 — Regras puras (`shared`)      | 9       | 1     |
+| F1 — Regras puras (`shared`)      | 9       | 2     |
 | F2 — Banco e seed                 | 1       | 0     |
 | F3 — API (req. 1–5, 7)            | 6       | 0     |
 | F4 — Telas (req. 1–5, 7)          | 5       | 0     |
@@ -38,7 +38,7 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | F6 — Supervisor (fecha req. 5)    | 2       | 0     |
 | F7 — Offline parcial (req. 9)     | 2       | 0     |
 | F8 — Entrega e docs               | 4       | 0     |
-| **Total**                         | **32**  | **2** |
+| **Total**                         | **32**  | **3** |
 | Opcionais                         | 3       | 0     |
 
 > Sem estimativas de tempo: com IA acelerando a implementação, elas não refletem dados reais. Prioridade: núcleo (F1–F4 + F8, req. 1–7) primeiro. Se o prazo apertar, corte na ordem: opcionais → F7 → F6 (T-25) → F5, e registre em README "o que ficou de fora".
@@ -79,11 +79,11 @@ Consumir `@yandeh/shared` hoje exige `pnpm --filter @yandeh/shared build` antes:
 - **Arquivos:** `packages/shared/src/rules.ts` (ou `money.ts`), testes.
 - **Commit:** `feat(shared): conversão para centavos e formatação BRL`
 
-### [ ] T-02 — Tabela efetiva com fallback TP01 e preço do cliente
+### [x] T-02 — Tabela efetiva com fallback TP01 e preço do cliente
 
 - **Refs:** RN02; D11; A2; R2.
 - **Depende de:** T-01
-- **Escopo:** `resolvePriceTableId(customer)` → `{ tableId, isFallback }` (ou função + flag); `unitPriceFor(product, tableId, priceItems)` → `Cents | null`.
+- **Escopo:** `resolvePriceTableId(customer)` → `{ tableId, isFallback }`; `unitPriceFor(product, tableId, priceItems)` → `Cents | null`.
 - **Fora:** UI do aviso (T-19).
 - **Aceite:** C004 (`null`) → TP01 com `isFallback = true`; C001 → TP01 sem fallback; preço P001 em TP01 = 2690.
 - **Validação manual:** `pnpm --filter @yandeh/shared build` e script tsx em `apps/api/` importando `@yandeh/shared`. C004 (Mercearia Dona Lúcia, `priceTableId: null`) → `resolvePriceTableId` = `TP01` com `isFallback === true`; C001 (`priceTableId: 'TP01'`) → `TP01` com `isFallback === false`; `unitPriceFor` de P001 na TP01 (seed 26,9) → `2690`; produto sem preço na tabela → `null`. Evidência: saída do script.

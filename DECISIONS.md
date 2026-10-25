@@ -87,10 +87,10 @@ Decisões marcadas **[autor]** foram tomadas pelo candidato (com os motivos dele
 
 ## D11 — Cliente sem tabela usa TP01 (fallback) [autor]
 
-- **Contexto:** C004 tem `tabela_preco_id: null`.
-- **Alternativas:** bloquear venda; perguntar ao produto.
-- **Escolha:** usar TP01 "Tabela Padrão" e mostrar isso claramente na UI.
-- **Por quê:** não impede a venda em campo. Trade-off: risco de preço errado.
+- **Contexto:** C004 tem `tabela_preco_id: null`. API e UI precisam do mesmo contrato da regra pura.
+- **Alternativas:** bloquear venda; perguntar ao produto; devolver só o id + flag em função separada.
+- **Escolha:** `resolvePriceTableId(customer) → { tableId, isFallback }`. `isFallback` significa que o fallback foi _usado_ (C001 com TP01 explícita → `false`). Id nulo, vazio ou só espaços → `{ tableId: 'TP01', isFallback: true }`. API e UI devem usar este formato.
+- **Por quê:** não impede a venda em campo; um único formato evita a API/UI divergirem. Trade-off: risco de preço errado.
 - **Com mais tempo:** refinaria a regra com o PO (bloquear, usar uma tabela padrão ou exigir cadastro antes da venda). Num teste técnico não dá pra refinar com o PO como num cenário real, então a escolha fica documentada como provisória.
 
 ## D12 — Repetir pedido mantém quantidade, mas não o desconto [autor]
