@@ -14,11 +14,6 @@ describe('lineTotals', () => {
   it.todo('arredonda por linha em centavos (PH001/P006: 40 x R$3,29 com 2% => líquido 12897)')
 })
 
-describe('isValidQuantity', () => {
-  it.todo('P006 (FD 20, somente múltiplo) aceita 40 e rejeita 30')
-  it.todo('P004 (CX 20, venda unitária permitida) aceita 7')
-})
-
 describe('statusForDiscount', () => {
   it.todo('V01 (alçada 5%) com item a 6% => Aguardando aprovação')
   it.todo('V01 com todos os itens <= 5% => Enviado')
