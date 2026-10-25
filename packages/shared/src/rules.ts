@@ -19,11 +19,6 @@ const notImplemented = (name: string): never => {
   throw new Error(`${name}: não implementado`)
 }
 
-/** Converte reais (number do seed) para centavos inteiros. */
-export function toCents(_reais: number): Cents {
-  return notImplemented('toCents')
-}
-
 /** Tabela efetiva do cliente (fallback TP01 quando nula). */
 export function resolvePriceTableId(_customer: Pick<Customer, 'priceTableId'>): string {
   return notImplemented('resolvePriceTableId')
