@@ -19,11 +19,6 @@ const notImplemented = (name: string): never => {
   throw new Error(`${name}: não implementado`)
 }
 
-/** Quantidade em unidades é válida para o produto (múltiplo da embalagem quando exigido)? */
-export function isValidQuantity(_product: Product, _quantityUnits: number): boolean {
-  return notImplemented('isValidQuantity')
-}
-
 /** Totais de uma linha, arredondados por linha em centavos. */
 export function lineTotals(_line: OrderLineInput): OrderLineTotals {
   return notImplemented('lineTotals')
