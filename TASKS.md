@@ -83,7 +83,7 @@ Consumir `@yandeh/shared` hoje exige `pnpm --filter @yandeh/shared build` antes:
 
 - **Refs:** RN02; D11; A2; R2.
 - **Depende de:** T-01
-- **Escopo:** `resolvePriceTableId(customer)` → `{ tableId, isFallback }` (ou função + flag); `unitPriceFor(product, tableId, priceItems)` → `Cents | null`.
+- **Escopo:** `resolvePriceTableId(customer)` → `{ tableId, isFallback }`; `unitPriceFor(product, tableId, priceItems)` → `Cents | null`.
 - **Fora:** UI do aviso (T-19).
 - **Aceite:** C004 (`null`) → TP01 com `isFallback = true`; C001 → TP01 sem fallback; preço P001 em TP01 = 2690.
 - **Validação manual:** `pnpm --filter @yandeh/shared build` e script tsx em `apps/api/` importando `@yandeh/shared`. C004 (Mercearia Dona Lúcia, `priceTableId: null`) → `resolvePriceTableId` = `TP01` com `isFallback === true`; C001 (`priceTableId: 'TP01'`) → `TP01` com `isFallback === false`; `unitPriceFor` de P001 na TP01 (seed 26,9) → `2690`; produto sem preço na tabela → `null`. Evidência: saída do script.
