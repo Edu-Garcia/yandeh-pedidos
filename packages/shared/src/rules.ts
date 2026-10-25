@@ -2,9 +2,7 @@ import type {
   Cents,
   Customer,
   OrderLineInput,
-  OrderLineTotals,
   OrderStatus,
-  OrderTotals,
   Product,
   ValidationIssue,
 } from './types'
@@ -17,16 +15,6 @@ export const FALLBACK_PRICE_TABLE_ID = 'TP01'
 
 const notImplemented = (name: string): never => {
   throw new Error(`${name}: não implementado`)
-}
-
-/** Totais de uma linha, arredondados por linha em centavos. */
-export function lineTotals(_line: OrderLineInput): OrderLineTotals {
-  return notImplemented('lineTotals')
-}
-
-/** Soma dos totais das linhas. */
-export function orderTotals(_lines: OrderLineInput[]): OrderTotals {
-  return notImplemented('orderTotals')
 }
 
 /** Crédito disponível = limite - utilizado - reservado (pedidos aguardando aprovação). */
