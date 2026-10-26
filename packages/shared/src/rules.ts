@@ -1,11 +1,4 @@
-import type {
-  Cents,
-  Customer,
-  OrderLineInput,
-  OrderStatus,
-  Product,
-  ValidationIssue,
-} from './types'
+import type { Cents, Customer, OrderLineInput, Product, ValidationIssue } from './types'
 
 // STUBS — regras de negócio ainda NÃO implementadas (ver PRD.md §6).
 // Cada função deve ser pura, operar em centavos e ser coberta por testes antes da implementação.
@@ -20,14 +13,6 @@ const notImplemented = (name: string): never => {
 /** Crédito disponível = limite - utilizado - reservado (pedidos aguardando aprovação). */
 export function availableCredit(_customer: Customer, _reserved: Cents): Cents {
   return notImplemented('availableCredit')
-}
-
-/** Status do pedido pela alçada: maior desconto de item vs alçada do vendedor. */
-export function statusForDiscount(
-  _lines: OrderLineInput[],
-  _authorityPercent: number,
-): OrderStatus {
-  return notImplemented('statusForDiscount')
 }
 
 /** Lista de bloqueios para envio (vazia = pode enviar). */
