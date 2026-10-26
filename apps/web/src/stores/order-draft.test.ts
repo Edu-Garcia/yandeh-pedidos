@@ -1,5 +1,5 @@
 import type { CustomerProduct } from '@yandeh/shared'
-import { formatBRL, lineTotals, orderTotals } from '@yandeh/shared'
+import { formatBRL, lineTotals, MINIMUM_ORDER_CENTS, orderTotals } from '@yandeh/shared'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
@@ -254,5 +254,54 @@ describe('order draft store', () => {
     expect(view.unitsText).toBe('40')
     expect(view.lotsText).toBe('2')
     expect(JSON.stringify(view)).not.toContain('P006')
+  })
+
+  it('exemplo C001: totais 52196 / 266 / 51930 e sem bloqueios', () => {
+    const draft = useOrderDraftStore()
+    draft.addProduct('C001', p001)
+    draft.setUnits('C001', 'P001', '10')
+    draft.addProduct('C001', p006)
+    draft.setLots('C001', 'P006', '2')
+    draft.setDiscount('C001', 'P006', '2')
+    draft.addProduct('C001', p010)
+    draft.setLots('C001', 'P010', '2')
+
+    expect(draft.draftTotals('C001')).toEqual({ gross: 52196, discount: 266, net: 51930 })
+    expect(draft.draftIssues('C001', 380000)).toEqual([])
+    expect(draft.hasInlineErrors('C001')).toBe(false)
+  })
+
+  it('C002 com ~R$ 400 bloqueia crédito; líquido < mínimo bloqueia mínimo', () => {
+    const draft = useOrderDraftStore()
+    const p001Tp02 = { ...p001, unitPrice: 2529 }
+    draft.addProduct('C002', p001Tp02)
+    draft.setUnits('C002', 'P001', '16')
+
+    expect(draft.draftTotals('C002').net).toBe(40464)
+    expect(draft.draftIssues('C002', 35000).map((issue) => issue.code)).toEqual([
+      'INSUFFICIENT_CREDIT',
+    ])
+
+    draft.addProduct('C001', p001)
+    expect(draft.draftTotals('C001').net).toBeLessThan(MINIMUM_ORDER_CENTS)
+    expect(draft.draftIssues('C001', 380000).map((issue) => issue.code)).toEqual(['BELOW_MINIMUM'])
+  })
+
+  it('gera Idempotency-Key uma vez por rascunho e limpa após o envio', () => {
+    const draft = useOrderDraftStore()
+    draft.addProduct('C001', p001)
+
+    const first = draft.ensureIdempotencyKey('C001')
+    const second = draft.ensureIdempotencyKey('C001')
+    expect(first).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    )
+    expect(second).toBe(first)
+    expect(draft.ensureIdempotencyKey('C002')).not.toBe(first)
+    expect(localStorage.length).toBe(0)
+
+    draft.clearDraft('C001')
+    expect(draft.linesOf('C001')).toEqual([])
+    expect(draft.ensureIdempotencyKey('C001')).not.toBe(first)
   })
 })

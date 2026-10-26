@@ -41,6 +41,17 @@ const c001: SellerCustomer = {
   availableCredit: 380000,
 }
 
+const c002: SellerCustomer = {
+  id: 'C002',
+  tradeName: 'Minibox Bom Preço',
+  city: 'Fortaleza',
+  uf: 'CE',
+  priceTableId: 'TP02',
+  priceTableName: 'Tabela Volume',
+  isFallback: false,
+  availableCredit: 35000,
+}
+
 const c004: SellerCustomer = {
   id: 'C004',
   tradeName: 'Mercearia Dona Lúcia',
@@ -52,7 +63,7 @@ const c004: SellerCustomer = {
   availableCredit: 300000,
 }
 
-const v01Wallet: SellerCustomer[] = [c001, c004]
+const v01Wallet: SellerCustomer[] = [c001, c002, c004]
 
 const p009: CustomerProduct = {
   id: 'P009',
@@ -92,6 +103,8 @@ const p001: CustomerProduct = {
   multipleOnly: false,
   unitPrice: 2690,
 }
+
+const p001Tp02: CustomerProduct = { ...p001, unitPrice: 2529 }
 
 const p004: CustomerProduct = {
   id: 'P004',
@@ -181,6 +194,48 @@ function setField(root: HTMLElement, testId: string, value: string): void {
   input.dispatchEvent(new Event('input', { bubbles: true }))
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function jsonResponse(status: number, body: unknown) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => body,
+    text: async () => JSON.stringify(body),
+  }
+}
+
+function sendButton(el: HTMLElement): HTMLButtonElement {
+  const button = el.querySelector('[data-testid="send-order"]') as HTMLButtonElement | null
+  if (!button) throw new Error('Botão Enviar não encontrado')
+  return button
+}
+
+function createdOrder(
+  status: 'Enviado' | 'Aguardando aprovação',
+  totals = { gross: 52196, discount: 266, net: 51930 },
+) {
+  return {
+    id: 'ord-1',
+    customerId: 'C001',
+    sellerId: 'V01',
+    status,
+    totals,
+    items: [],
+  }
+}
+
+async function addExampleC001(el: HTMLElement): Promise<void> {
+  await addFromSearch(el, p001)
+  setField(cartLine(el, 'P001'), 'cart-units', '10')
+  await addFromSearch(el, p006)
+  setField(cartLine(el, 'P006'), 'cart-lots', '2')
+  setField(cartLine(el, 'P006'), 'cart-discount', '2')
+  await addFromSearch(el, p010)
+  setField(cartLine(el, 'P010'), 'cart-lots', '2')
+  await nextTick()
+}
+
 async function addFromSearch(el: HTMLElement, product: CustomerProduct): Promise<void> {
   fetchCustomerProducts.mockResolvedValueOnce([product])
   await searchFor(el, product.description)
@@ -226,6 +281,7 @@ describe('OrderPage', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+    vi.unstubAllGlobals()
     mounted?.unmount()
     mounted = null
     host?.remove()
@@ -539,7 +595,7 @@ describe('OrderPage', () => {
 
     const both = 40 * 333 + 7 * 719
     expect(
-      normalizeBRL(el.querySelector('[data-testid="cart-subtotal"]')?.textContent ?? ''),
+      normalizeBRL(el.querySelector('[data-testid="order-net"]')?.textContent ?? ''),
     ).toContain(normalizeBRL(formatBRL(both)))
 
     const remove = p004Line.querySelector('[data-testid="remove-line"]') as HTMLButtonElement | null
@@ -548,9 +604,241 @@ describe('OrderPage', () => {
 
     expect(el.querySelector('[data-product-id="P004"][data-testid="cart-line"]')).toBeNull()
     expect(
-      normalizeBRL(el.querySelector('[data-testid="cart-subtotal"]')?.textContent ?? ''),
+      normalizeBRL(el.querySelector('[data-testid="order-net"]')?.textContent ?? ''),
     ).toContain(normalizeBRL(formatBRL(40 * 333)))
-    expect(el.textContent).not.toContain('Enviar')
+    expect(sendButton(el).disabled).toBe(true)
+    expect(el.textContent).toContain('Total líquido abaixo de R$ 300,00')
     expect(el.textContent).not.toContain('precisará de aprovação')
+  })
+
+  it('painel de totais do exemplo C001: R$ 521,96 / R$ 2,66 / R$ 519,30 sem bloqueios', async () => {
+    fetchSellerCustomers.mockResolvedValue(v01Wallet)
+    const el = await render('C001')
+    await waitForText(el, 'Mercadinho São José')
+    await addExampleC001(el)
+
+    expect(
+      normalizeBRL(el.querySelector('[data-testid="order-gross"]')?.textContent ?? ''),
+    ).toContain(normalizeBRL(formatBRL(52196)))
+    expect(
+      normalizeBRL(el.querySelector('[data-testid="order-discount"]')?.textContent ?? ''),
+    ).toContain(normalizeBRL(formatBRL(266)))
+    expect(
+      normalizeBRL(el.querySelector('[data-testid="order-net"]')?.textContent ?? ''),
+    ).toContain(normalizeBRL(formatBRL(51930)))
+    expect(el.querySelector('[data-testid="order-blocks"]')).toBeNull()
+    expect(el.querySelector('[data-testid="approval-warning"]')).toBeNull()
+    expect(sendButton(el).disabled).toBe(false)
+    expect(el.textContent).not.toContain('P001')
+    expect(el.textContent).not.toContain('P006')
+    expect(el.textContent).not.toContain('P010')
+  })
+
+  it('lista bloqueio de crédito em C002 (~R$ 400) e desabilita Enviar', async () => {
+    fetchSellerCustomers.mockResolvedValue(v01Wallet)
+    const el = await render('C002')
+    await waitForText(el, 'Minibox Bom Preço')
+    await addFromSearch(el, p001Tp02)
+    setField(cartLine(el, 'P001'), 'cart-units', '16')
+    await nextTick()
+
+    expect(el.querySelector('[data-issue-code="INSUFFICIENT_CREDIT"]')?.textContent).toBe(
+      'Total líquido acima do crédito disponível',
+    )
+    expect(sendButton(el).disabled).toBe(true)
+    expect(el.textContent).not.toContain('P001')
+  })
+
+  it('lista bloqueio de mínimo e desabilita Enviar', async () => {
+    fetchSellerCustomers.mockResolvedValue(v01Wallet)
+    const el = await render('C001')
+    await waitForText(el, 'Mercadinho São José')
+    await addFromSearch(el, p001)
+    await nextTick()
+
+    expect(el.querySelector('[data-issue-code="BELOW_MINIMUM"]')?.textContent).toBe(
+      'Total líquido abaixo de R$ 300,00',
+    )
+    expect(sendButton(el).disabled).toBe(true)
+  })
+
+  it('desabilita Enviar quando há erro inline de quantidade', async () => {
+    fetchSellerCustomers.mockResolvedValue(v01Wallet)
+    const el = await render('C001')
+    await waitForText(el, 'Mercadinho São José')
+    await addExampleC001(el)
+    expect(sendButton(el).disabled).toBe(false)
+
+    setField(cartLine(el, 'P001'), 'cart-units', '')
+    await nextTick()
+    expect(el.querySelector('[data-testid="cart-quantity-error"]')).not.toBeNull()
+    expect(sendButton(el).disabled).toBe(true)
+  })
+
+  it('mostra aviso de alçada com arroz a 6%', async () => {
+    fetchSellerCustomers.mockResolvedValue(v01Wallet)
+    const el = await render('C001')
+    await waitForText(el, 'Mercadinho São José')
+    await addExampleC001(el)
+    setField(cartLine(el, 'P001'), 'cart-discount', '6')
+    await nextTick()
+
+    expect(el.querySelector('[data-testid="approval-warning"]')?.textContent).toContain(
+      'precisará de aprovação',
+    )
+    expect(sendButton(el).disabled).toBe(false)
+    expect(el.querySelector('[data-testid="order-blocks"]')).toBeNull()
+  })
+
+  it('envia com Idempotency-Key UUID e reaproveita a chave no retry', async () => {
+    fetchSellerCustomers.mockResolvedValue(v01Wallet)
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(500, { message: 'falha temporária' }))
+      .mockResolvedValueOnce(jsonResponse(201, createdOrder('Enviado')))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const el = await render('C001')
+    await waitForText(el, 'Mercadinho São José')
+    await addExampleC001(el)
+
+    sendButton(el).click()
+    await waitForText(el, 'falha temporária')
+    expect(el.querySelector('[data-testid="submit-error"]')?.textContent).toContain(
+      'falha temporária',
+    )
+    expect(el.querySelector('[data-testid="order-result"]')).toBeNull()
+
+    sendButton(el).click()
+    await waitForText(el, 'Enviado')
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    const firstHeaders = new Headers((fetchMock.mock.calls[0] as [string, RequestInit])[1].headers)
+    const secondHeaders = new Headers((fetchMock.mock.calls[1] as [string, RequestInit])[1].headers)
+    const firstKey = firstHeaders.get('Idempotency-Key')
+    expect(firstKey).toMatch(UUID_RE)
+    expect(secondHeaders.get('Idempotency-Key')).toBe(firstKey)
+    expect(firstHeaders.get('X-Seller-Id')).toBe('V01')
+    const body = JSON.parse(String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body)) as {
+      customerId: string
+      items: { productId: string; quantity: number }[]
+    }
+    expect(body.customerId).toBe('C001')
+    expect(body.items).toEqual([
+      { productId: 'P001', quantity: 10, discountPercent: 0 },
+      { productId: 'P006', quantity: 40, discountPercent: 2 },
+      { productId: 'P010', quantity: 24, discountPercent: 0 },
+    ])
+  })
+
+  it('impede o duplo clique enquanto o envio está em andamento', async () => {
+    fetchSellerCustomers.mockResolvedValue(v01Wallet)
+    let resolveFetch: ((value: unknown) => void) | undefined
+    const fetchMock = vi.fn().mockReturnValue(
+      new Promise((resolve) => {
+        resolveFetch = resolve
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const el = await render('C001')
+    await waitForText(el, 'Mercadinho São José')
+    await addExampleC001(el)
+
+    sendButton(el).click()
+    await nextTick()
+    sendButton(el).click()
+    sendButton(el).click()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(sendButton(el).disabled).toBe(true)
+    expect(sendButton(el).textContent).toContain('Enviando')
+
+    resolveFetch?.(jsonResponse(201, createdOrder('Enviado')))
+    await waitForText(el, 'Enviado')
+  })
+
+  it('exibe o 422 da API com a mensagem do PRD', async () => {
+    fetchSellerCustomers.mockResolvedValue(v01Wallet)
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(422, [
+        {
+          code: 'BELOW_MINIMUM',
+          message: 'Total líquido abaixo de R$ 300,00',
+          minimum: 30000,
+          net: 51930,
+        },
+      ]),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const el = await render('C001')
+    await waitForText(el, 'Mercadinho São José')
+    await addExampleC001(el)
+
+    sendButton(el).click()
+    await waitForText(el, 'Total líquido abaixo de R$ 300,00')
+    expect(el.querySelector('[data-testid="submit-error"]')?.textContent).toContain(
+      'Total líquido abaixo de R$ 300,00',
+    )
+    expect(el.querySelector('[data-testid="order-result"]')).toBeNull()
+    expect(el.querySelector('[data-testid="cart"]')).not.toBeNull()
+  })
+
+  it('mostra o resultado Enviado e limpa o rascunho', async () => {
+    fetchSellerCustomers.mockResolvedValue(v01Wallet)
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(201, createdOrder('Enviado'))))
+
+    const el = await render('C001')
+    await waitForText(el, 'Mercadinho São José')
+    await addExampleC001(el)
+    sendButton(el).click()
+    await waitForText(el, 'Enviado')
+
+    const result = el.querySelector('[data-testid="order-result"]')
+    expect(result?.getAttribute('data-order-status')).toBe('Enviado')
+    expect(result?.textContent).toContain('O pedido foi enviado.')
+    expect(el.querySelector('[data-testid="cart"]')).toBeNull()
+    expect(el.querySelector('[data-testid="order-totals"]')).toBeNull()
+    expect(el.textContent).not.toContain('P001')
+    expect(normalizeBRL(result?.textContent ?? '')).toContain(normalizeBRL(formatBRL(51930)))
+
+    const newOrder = el.querySelector('[data-testid="new-order"]') as HTMLButtonElement
+    newOrder.click()
+    await nextTick()
+    expect(el.querySelector('[data-testid="order-result"]')).toBeNull()
+    expect(el.querySelector('[data-testid="cart-empty"]')).not.toBeNull()
+  })
+
+  it('mostra o resultado Aguardando aprovação com o aviso de alçada', async () => {
+    fetchSellerCustomers.mockResolvedValue(v01Wallet)
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          jsonResponse(
+            201,
+            createdOrder('Aguardando aprovação', { gross: 52196, discount: 1880, net: 50316 }),
+          ),
+        ),
+    )
+
+    const el = await render('C001')
+    await waitForText(el, 'Mercadinho São José')
+    await addExampleC001(el)
+    setField(cartLine(el, 'P001'), 'cart-discount', '6')
+    await nextTick()
+    expect(el.querySelector('[data-testid="approval-warning"]')?.textContent).toContain(
+      'precisará de aprovação',
+    )
+
+    sendButton(el).click()
+    await waitForText(el, 'Aguardando aprovação')
+
+    const result = el.querySelector('[data-testid="order-result"]')
+    expect(result?.getAttribute('data-order-status')).toBe('Aguardando aprovação')
+    expect(result?.textContent).toContain('precisará de aprovação')
+    expect(el.querySelector('[data-testid="cart"]')).toBeNull()
+    expect(el.textContent).not.toContain('P001')
   })
 })

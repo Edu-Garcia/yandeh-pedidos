@@ -6,11 +6,14 @@ import {
   lotsFromUnits,
   orderTotals,
   unitsFromLots,
+  validateOrder,
   type CustomerProduct,
   type OrderLineInput,
   type OrderLineTotals,
   type OrderTotals,
+  type Product,
   type SaleUnit,
+  type ValidationIssue,
 } from '@yandeh/shared'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
@@ -63,6 +66,14 @@ export function defaultUnits(
   return product.multipleOnly ? product.packFactor : 1
 }
 
+export function newIdempotencyKey(): string {
+  return crypto.randomUUID()
+}
+
+export function toProduct(product: CustomerProduct): Product {
+  return { ...product, active: true }
+}
+
 export function toPricedLine(line: DraftLine): OrderLineInput | null {
   if (
     !isValidQuantity(line.product, line.quantityUnits) ||
@@ -100,6 +111,7 @@ export function buildLineView(line: DraftLine): DraftLineView {
 /** Rascunho do pedido em unidades, por cliente (RN05, D9). Sem persistência — isso é T-26. */
 export const useOrderDraftStore = defineStore('orderDraft', () => {
   const linesByCustomer = ref<Record<string, DraftLine[]>>({})
+  const idempotencyKeyByCustomer = ref<Record<string, string>>({})
 
   function linesOf(customerId: string): DraftLine[] {
     return linesByCustomer.value[customerId] ?? []
@@ -165,15 +177,57 @@ export const useOrderDraftStore = defineStore('orderDraft', () => {
     return buildLineView(line)
   }
 
-  function draftTotals(customerId: string): OrderTotals {
-    const priced = linesOf(customerId)
+  function pricedLinesOf(customerId: string): OrderLineInput[] {
+    return linesOf(customerId)
       .map(toPricedLine)
       .filter((line): line is OrderLineInput => line !== null)
-    return orderTotals(priced)
+  }
+
+  function draftTotals(customerId: string): OrderTotals {
+    return orderTotals(pricedLinesOf(customerId))
+  }
+
+  function draftIssues(customerId: string, availableCredit: number): ValidationIssue[] {
+    const lines = linesOf(customerId)
+    return validateOrder({
+      lines: lines.map((line) => ({
+        productId: line.product.id,
+        quantityUnits: line.quantityUnits,
+        unitPrice: line.product.unitPrice,
+        discountPercent: line.discountPercent,
+      })),
+      products: lines.map((line) => toProduct(line.product)),
+      availableCredit,
+    })
+  }
+
+  function hasInlineErrors(customerId: string): boolean {
+    return linesOf(customerId).some((line) => {
+      const view = buildLineView(line)
+      return view.quantityError !== null || view.discountError !== null
+    })
+  }
+
+  function ensureIdempotencyKey(customerId: string): string {
+    const existing = idempotencyKeyByCustomer.value[customerId]
+    if (existing) return existing
+    const key = newIdempotencyKey()
+    idempotencyKeyByCustomer.value = { ...idempotencyKeyByCustomer.value, [customerId]: key }
+    return key
+  }
+
+  function clearDraft(customerId: string): void {
+    const remainingLines = { ...linesByCustomer.value }
+    const remainingKeys = { ...idempotencyKeyByCustomer.value }
+    delete remainingLines[customerId]
+    delete remainingKeys[customerId]
+    linesByCustomer.value = remainingLines
+    idempotencyKeyByCustomer.value = remainingKeys
   }
 
   return {
     linesByCustomer,
+    idempotencyKeyByCustomer,
     linesOf,
     hasProduct,
     addProduct,
@@ -182,6 +236,11 @@ export const useOrderDraftStore = defineStore('orderDraft', () => {
     setDiscount,
     removeLine,
     viewOf,
+    pricedLinesOf,
     draftTotals,
+    draftIssues,
+    hasInlineErrors,
+    ensureIdempotencyKey,
+    clearDraft,
   }
 })
