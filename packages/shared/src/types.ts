@@ -25,6 +25,11 @@ export interface Seller {
   discountAuthorityPercent: number
 }
 
+export interface Supervisor {
+  id: string
+  name: string
+}
+
 export interface Customer {
   id: string
   tradeName: string
