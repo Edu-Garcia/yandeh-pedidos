@@ -10,13 +10,19 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import {
   ApiError,
   createOrder,
+  fetchCustomerOrders,
   fetchCustomerProducts,
   fetchSellerCustomers,
   isHiddenResourceError,
+  repeatCustomerOrder,
   type CreatedOrder,
+  type CustomerOrderSummary,
+  type RepeatNotice,
+  type RepeatRemovedItem,
 } from '@/api'
 import CartLine from '@/components/CartLine.vue'
 import SessionBar from '@/components/SessionBar.vue'
+import { formatCivilDate, formatRemovedItem } from '@/order-history'
 import { PRODUCT_SEARCH_DEBOUNCE_MS } from '@/product-search'
 import { useOrderDraftStore } from '@/stores/order-draft'
 import { useSessionStore } from '@/stores/session'
@@ -43,7 +49,24 @@ const submitError = ref<string | null>(null)
 const submitIssues = ref<ValidationIssue[]>([])
 const submitted = ref<CreatedOrder | null>(null)
 
+const orders = ref<CustomerOrderSummary[]>([])
+const historyLoading = ref(false)
+const historyError = ref<string | null>(null)
+const repeating = ref(false)
+const pendingOverwriteOrderId = ref<string | null>(null)
+const repeatError = ref<string | null>(null)
+const removedItems = ref<RepeatRemovedItem[]>([])
+const repeatNotices = ref<RepeatNotice[]>([])
+const repeatLoaded = ref(false)
+
 const cartLines = computed(() => draft.linesOf(props.clientId))
+const noticeByProductId = computed(() => {
+  const map = new Map<string, string>()
+  for (const notice of repeatNotices.value) {
+    map.set(notice.productId, notice.message)
+  }
+  return map
+})
 const cartTotals = computed(() => draft.draftTotals(props.clientId))
 const issues = computed(() =>
   customer.value ? draft.draftIssues(props.clientId, customer.value.availableCredit) : [],
@@ -73,6 +96,22 @@ function resetSubmitState(): void {
   submitted.value = null
 }
 
+function resetRepeatState(): void {
+  pendingOverwriteOrderId.value = null
+  repeating.value = false
+  repeatError.value = null
+  removedItems.value = []
+  repeatNotices.value = []
+  repeatLoaded.value = false
+}
+
+function resetHistoryState(): void {
+  orders.value = []
+  historyLoading.value = false
+  historyError.value = null
+  resetRepeatState()
+}
+
 async function loadCustomer(): Promise<void> {
   const sellerId = session.sellerId
   if (!sellerId) {
@@ -93,6 +132,7 @@ async function loadCustomer(): Promise<void> {
       return
     }
     customer.value = found
+    void loadHistory()
   } catch (error) {
     if (isHiddenResourceError(error)) {
       notFound.value = true
@@ -102,6 +142,73 @@ async function loadCustomer(): Promise<void> {
   } finally {
     customerLoading.value = false
   }
+}
+
+async function loadHistory(): Promise<void> {
+  historyLoading.value = true
+  historyError.value = null
+  try {
+    orders.value = await fetchCustomerOrders(props.clientId)
+  } catch (error) {
+    if (isHiddenResourceError(error)) {
+      notFound.value = true
+      return
+    }
+    historyError.value = 'Não deu para carregar o histórico. Confira a API e tente de novo.'
+    orders.value = []
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+async function runRepeat(orderId: string): Promise<void> {
+  repeating.value = true
+  repeatError.value = null
+  try {
+    const result = await repeatCustomerOrder(props.clientId, orderId)
+    draft.loadRepeatDraft(
+      props.clientId,
+      result.lines.map((line) => ({
+        product: line.product,
+        quantityUnits: line.quantityUnits,
+        discountPercent: line.discountPercent,
+      })),
+    )
+    removedItems.value = result.removed
+    repeatNotices.value = result.notices
+    repeatLoaded.value = true
+  } catch (error) {
+    if (isHiddenResourceError(error)) {
+      notFound.value = true
+      return
+    }
+    repeatError.value =
+      error instanceof ApiError && error.message
+        ? error.message
+        : 'Não deu para repetir o pedido. Confira a API e tente de novo.'
+  } finally {
+    repeating.value = false
+  }
+}
+
+function requestRepeat(orderId: string): void {
+  if (repeating.value) return
+  if (draft.hasDraft(props.clientId)) {
+    pendingOverwriteOrderId.value = orderId
+    return
+  }
+  pendingOverwriteOrderId.value = null
+  void runRepeat(orderId)
+}
+
+function cancelOverwrite(): void {
+  pendingOverwriteOrderId.value = null
+}
+
+function confirmOverwrite(): void {
+  const orderId = pendingOverwriteOrderId.value
+  pendingOverwriteOrderId.value = null
+  if (orderId) void runRepeat(orderId)
 }
 
 async function runSearch(rawQuery: string): Promise<void> {
@@ -192,6 +299,8 @@ async function submitOrder(): Promise<void> {
 
 function startNewOrder(): void {
   resetSubmitState()
+  resetRepeatState()
+  void loadHistory()
 }
 
 watch(
@@ -203,6 +312,7 @@ watch(
     hasSearched.value = false
     lastQuery.value = ''
     resetSubmitState()
+    resetHistoryState()
     if (debounceHandle !== undefined) clearTimeout(debounceHandle)
     searchSeq += 1
     void loadCustomer()
@@ -293,6 +403,113 @@ onUnmounted(() => {
           Cliente sem tabela — usando Tabela Padrão
         </p>
 
+        <section data-testid="customer-history" class="mt-8">
+          <h2 class="font-display text-2xl text-counter">Histórico</h2>
+
+          <p
+            v-if="historyLoading"
+            data-testid="history-loading"
+            class="mt-4 font-sans text-base text-counter"
+          >
+            Carregando o histórico…
+          </p>
+
+          <div v-else-if="historyError" data-testid="history-error" class="mt-4 space-y-3">
+            <p class="font-sans text-base text-counter">{{ historyError }}</p>
+            <button
+              type="button"
+              class="min-h-12 border-b-2 border-produce px-1 font-sans text-base text-produce focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-safety"
+              @click="loadHistory"
+            >
+              Tentar de novo
+            </button>
+          </div>
+
+          <p
+            v-else-if="orders.length === 0"
+            data-testid="history-empty"
+            class="mt-4 font-sans text-base text-steel"
+          >
+            Nenhum pedido neste cliente.
+          </p>
+
+          <ul v-else class="mt-4 divide-y divide-steel/40 border-y border-steel/40">
+            <li
+              v-for="order in orders"
+              :key="order.id"
+              :data-order-id="order.id"
+              data-testid="history-row"
+              class="py-4"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <span class="min-w-0">
+                  <span class="block font-display text-xl leading-tight text-counter">
+                    {{ formatCivilDate(order.date) }}
+                  </span>
+                  <span
+                    class="mt-1 block font-sans text-sm text-steel"
+                    data-testid="history-status"
+                  >
+                    {{ order.status }}
+                  </span>
+                </span>
+                <span
+                  data-testid="history-total"
+                  class="shrink-0 text-right font-display text-xl leading-tight text-counter"
+                >
+                  {{ formatBRL(order.total) }}
+                </span>
+              </div>
+              <button
+                type="button"
+                data-testid="repeat-order"
+                :disabled="repeating"
+                class="mt-3 min-h-12 border-b-2 px-1 font-sans text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-safety disabled:border-steel disabled:text-steel"
+                :class="repeating ? 'border-steel text-steel' : 'border-produce text-produce'"
+                @click="requestRepeat(order.id)"
+              >
+                {{ repeating ? 'Repetindo…' : 'Repetir' }}
+              </button>
+
+              <div
+                v-if="pendingOverwriteOrderId === order.id"
+                data-testid="overwrite-confirm"
+                class="-mx-4 mt-4 border-l-4 border-safety bg-safety/20 px-4 py-3"
+              >
+                <p class="font-sans text-base text-counter">
+                  Este pedido já tem itens. Repetir substitui o rascunho atual.
+                </p>
+                <div class="mt-3 flex flex-wrap gap-4">
+                  <button
+                    type="button"
+                    data-testid="overwrite-cancel"
+                    class="min-h-12 border-b-2 border-steel px-1 font-sans text-base text-steel focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-safety"
+                    @click="cancelOverwrite"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="overwrite-accept"
+                    class="min-h-12 border-b-2 border-produce px-1 font-sans text-base text-produce focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-safety"
+                    @click="confirmOverwrite"
+                  >
+                    Substituir
+                  </button>
+                </div>
+              </div>
+            </li>
+          </ul>
+
+          <p
+            v-if="repeatError"
+            data-testid="repeat-error"
+            class="-mx-4 mt-4 border-l-4 border-safety bg-safety/20 px-4 py-3 font-sans text-base text-counter"
+          >
+            {{ repeatError }}
+          </p>
+        </section>
+
         <label class="mt-8 block">
           <span class="font-sans text-sm text-steel">Buscar produto</span>
           <input
@@ -382,6 +599,23 @@ onUnmounted(() => {
         <section data-testid="cart" class="mt-10">
           <h2 class="font-display text-2xl text-counter">Itens do pedido</h2>
           <p
+            v-if="repeatLoaded"
+            data-testid="repeat-review-notice"
+            class="-mx-4 mt-4 border-l-4 border-produce bg-produce/10 px-4 py-3 font-sans text-base text-counter"
+          >
+            Pedido carregado para revisão. Nada foi enviado.
+          </p>
+          <ul v-if="removedItems.length > 0" data-testid="repeat-removed" class="mt-4 space-y-2">
+            <li
+              v-for="item in removedItems"
+              :key="item.productId"
+              data-testid="repeat-removed-item"
+              class="-mx-4 border-l-4 border-safety bg-safety/20 px-4 py-3 font-sans text-base text-counter"
+            >
+              {{ formatRemovedItem(item) }}
+            </li>
+          </ul>
+          <p
             v-if="cartLines.length === 0"
             data-testid="cart-empty"
             class="mt-4 font-sans text-base text-steel"
@@ -394,6 +628,7 @@ onUnmounted(() => {
               :key="line.product.id"
               :customer-id="customer.id"
               :line="line"
+              :notice="noticeByProductId.get(line.product.id) ?? null"
             />
           </ul>
         </section>

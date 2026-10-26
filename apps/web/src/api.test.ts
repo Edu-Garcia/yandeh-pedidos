@@ -4,9 +4,11 @@ import {
   ApiError,
   apiErrorFromBody,
   createOrder,
+  fetchCustomerOrders,
   fetchCustomerProducts,
   fetchSellerCustomers,
   isHiddenResourceError,
+  repeatCustomerOrder,
 } from './api'
 import { useSessionStore } from './stores/session'
 
@@ -117,6 +119,56 @@ describe('createOrder', () => {
     expect(headers.get('X-Seller-Id')).toBe('V01')
     expect(headers.get('Idempotency-Key')).toBe(key)
     expect(headers.get('Content-Type')).toBe('application/json')
+  })
+})
+
+describe('fetchCustomerOrders', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    setActivePinia(createPinia())
+    vi.unstubAllGlobals()
+  })
+
+  it('chama GET /customers/:id/orders com X-Seller-Id da sessão', async () => {
+    useSessionStore().signInSeller(carlos)
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [],
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchCustomerOrders('C001')
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('http://localhost:3333/customers/C001/orders')
+    expect(init.method ?? 'GET').toBe('GET')
+    expect(new Headers(init.headers).get('X-Seller-Id')).toBe('V01')
+  })
+})
+
+describe('repeatCustomerOrder', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    setActivePinia(createPinia())
+    vi.unstubAllGlobals()
+  })
+
+  it('chama POST /customers/:id/orders/:orderId/repeat com X-Seller-Id', async () => {
+    useSessionStore().signInSeller(carlos)
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ lines: [], removed: [], notices: [] }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await repeatCustomerOrder('C001', 'PH001')
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('http://localhost:3333/customers/C001/orders/PH001/repeat')
+    expect(init.method).toBe('POST')
+    expect(new Headers(init.headers).get('X-Seller-Id')).toBe('V01')
   })
 })
 

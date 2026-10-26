@@ -3,7 +3,11 @@ import { formatBRL } from '@yandeh/shared'
 import { computed } from 'vue'
 import { useOrderDraftStore, type DraftLine } from '@/stores/order-draft'
 
-const props = defineProps<{ customerId: string; line: DraftLine }>()
+const props = defineProps<{
+  customerId: string
+  line: DraftLine
+  notice?: string | null
+}>()
 const draft = useOrderDraftStore()
 const view = computed(() => draft.viewOf(props.line))
 const quantityErrorId = computed(() => `quantity-error-${props.line.product.id}`)
@@ -79,6 +83,14 @@ function remove(): void {
         />
       </label>
     </div>
+
+    <p
+      v-if="notice"
+      data-testid="cart-line-notice"
+      class="-mx-3 mt-2 border-l-4 border-safety bg-safety/20 px-3 py-2 font-sans text-sm text-counter"
+    >
+      {{ notice }}
+    </p>
 
     <p
       v-if="view.quantityError"

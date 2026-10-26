@@ -225,11 +225,25 @@ export const useOrderDraftStore = defineStore('orderDraft', () => {
     idempotencyKeyByCustomer.value = remainingKeys
   }
 
+  function hasDraft(customerId: string): boolean {
+    return linesOf(customerId).length > 0
+  }
+
+  /** Substitui o rascunho com o retorno do repeat. Descarta a chave (rascunho novo). */
+  function loadRepeatDraft(customerId: string, lines: DraftLine[]): void {
+    replaceCustomerLines(customerId, lines)
+    const remainingKeys = { ...idempotencyKeyByCustomer.value }
+    delete remainingKeys[customerId]
+    idempotencyKeyByCustomer.value = remainingKeys
+  }
+
   return {
     linesByCustomer,
     idempotencyKeyByCustomer,
     linesOf,
     hasProduct,
+    hasDraft,
+    loadRepeatDraft,
     addProduct,
     setUnits,
     setLots,

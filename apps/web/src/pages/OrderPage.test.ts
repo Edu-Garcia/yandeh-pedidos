@@ -1,10 +1,10 @@
 import type { CustomerProduct, SellerCustomer } from '@yandeh/shared'
-import { formatBRL } from '@yandeh/shared'
+import { formatBRL, orderTotals } from '@yandeh/shared'
 import { createPinia, setActivePinia } from 'pinia'
 import { createApp, nextTick, type App } from 'vue'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ApiError } from '@/api'
+import { ApiError, type RepeatDraftResponse } from '@/api'
 import { PRODUCT_SEARCH_DEBOUNCE_MS } from '@/product-search'
 import { routes } from '@/router'
 import { DISCOUNT_ERROR, QUANTITY_ERROR } from '@/stores/order-draft'
@@ -13,6 +13,8 @@ import OrderPage from './OrderPage.vue'
 
 const fetchSellerCustomers = vi.fn()
 const fetchCustomerProducts = vi.fn()
+const fetchCustomerOrders = vi.fn()
+const repeatCustomerOrder = vi.fn()
 
 vi.mock('@/api', async () => {
   const actual = await vi.importActual<typeof import('@/api')>('@/api')
@@ -20,6 +22,8 @@ vi.mock('@/api', async () => {
     ...actual,
     fetchSellerCustomers: (...args: unknown[]) => fetchSellerCustomers(...args),
     fetchCustomerProducts: (...args: unknown[]) => fetchCustomerProducts(...args),
+    fetchCustomerOrders: (...args: unknown[]) => fetchCustomerOrders(...args),
+    repeatCustomerOrder: (...args: unknown[]) => repeatCustomerOrder(...args),
   }
 })
 
@@ -277,6 +281,9 @@ describe('OrderPage', () => {
     document.body.innerHTML = ''
     fetchSellerCustomers.mockReset()
     fetchCustomerProducts.mockReset()
+    fetchCustomerOrders.mockReset()
+    repeatCustomerOrder.mockReset()
+    fetchCustomerOrders.mockResolvedValue([])
   })
 
   afterEach(() => {
@@ -840,5 +847,323 @@ describe('OrderPage', () => {
     expect(result?.textContent).toContain('precisará de aprovação')
     expect(el.querySelector('[data-testid="cart"]')).toBeNull()
     expect(el.textContent).not.toContain('P001')
+  })
+
+  const ph001Total = orderTotals([
+    { productId: 'P001', quantityUnits: 10, unitPrice: 2590, discountPercent: 0 },
+    { productId: 'P006', quantityUnits: 40, unitPrice: 329, discountPercent: 2 },
+    { productId: 'P010', quantityUnits: 24, unitPrice: 489, discountPercent: 0 },
+    { productId: 'P022', quantityUnits: 30, unitPrice: 259, discountPercent: 0 },
+  ]).net
+
+  const ph002Total = orderTotals([
+    { productId: 'P002', quantityUnits: 15, unitPrice: 749, discountPercent: 5 },
+    { productId: 'P011', quantityUnits: 12, unitPrice: 879, discountPercent: 0 },
+    { productId: 'P015', quantityUnits: 24, unitPrice: 239, discountPercent: 0 },
+  ]).net
+
+  const c001History = [
+    { id: 'PH002', date: '2026-10-02', status: 'Faturado' as const, total: ph002Total },
+    { id: 'PH001', date: '2026-09-15', status: 'Faturado' as const, total: ph001Total },
+  ]
+
+  const ph001Repeat: RepeatDraftResponse = {
+    lines: [
+      {
+        productId: 'P001',
+        product: p001,
+        quantityUnits: 10,
+        discountPercent: 0,
+        lots: 10,
+      },
+      {
+        productId: 'P006',
+        product: p006,
+        quantityUnits: 40,
+        discountPercent: 0,
+        lots: 2,
+      },
+      {
+        productId: 'P010',
+        product: p010,
+        quantityUnits: 24,
+        discountPercent: 0,
+        lots: 2,
+      },
+    ],
+    removed: [
+      {
+        productId: 'P022',
+        description: 'Biscoito Recheado Chocolate 140g',
+        ean: '7891366875370',
+        reason: 'Produto inativo',
+      },
+    ],
+    notices: [],
+  }
+
+  function historyRow(el: HTMLElement, orderId: string): HTMLElement {
+    const row = el.querySelector(`[data-testid="history-row"][data-order-id="${orderId}"]`)
+    if (!row) throw new Error(`Pedido ${orderId} não encontrado no histórico`)
+    return row as HTMLElement
+  }
+
+  async function openC001WithHistory(): Promise<HTMLElement> {
+    fetchSellerCustomers.mockResolvedValue(v01Wallet)
+    fetchCustomerOrders.mockResolvedValue(c001History)
+    const el = await render('C001')
+    await waitForText(el, 'Mercadinho São José')
+    await waitForText(el, '15/09/2026')
+    return el
+  }
+
+  it('lista o histórico com data civil, status e total em BRL', async () => {
+    const el = await openC001WithHistory()
+
+    expect(fetchCustomerOrders).toHaveBeenCalledWith('C001')
+    const ph001 = historyRow(el, 'PH001')
+    expect(ph001.textContent).toContain('15/09/2026')
+    expect(ph001.textContent).toContain('Faturado')
+    expect(normalizeBRL(ph001.textContent ?? '')).toContain(normalizeBRL(formatBRL(ph001Total)))
+    expect(ph001.textContent).toContain('Repetir')
+
+    const ph002 = historyRow(el, 'PH002')
+    expect(ph002.textContent).toContain('02/10/2026')
+    expect(ph002.textContent).toContain('Faturado')
+    expect(normalizeBRL(ph002.textContent ?? '')).toContain(normalizeBRL(formatBRL(ph002Total)))
+
+    expect(el.textContent).not.toContain('PH001')
+    expect(el.textContent).not.toContain('P022')
+    expect(el.textContent).not.toContain('P001')
+  })
+
+  it('repete o pedido carregando o carrinho com preço atual, desconto 0 e removido sem id', async () => {
+    const el = await openC001WithHistory()
+    repeatCustomerOrder.mockResolvedValue(ph001Repeat)
+
+    const repeat = historyRow(el, 'PH001').querySelector(
+      '[data-testid="repeat-order"]',
+    ) as HTMLButtonElement
+    repeat.click()
+    await waitForText(el, 'Biscoito Recheado Chocolate 140g removido (inativo)')
+
+    expect(repeatCustomerOrder).toHaveBeenCalledWith('C001', 'PH001')
+    expect(el.querySelector('[data-testid="repeat-review-notice"]')?.textContent).toContain(
+      'Pedido carregado para revisão. Nada foi enviado.',
+    )
+    expect(el.querySelector('[data-testid="repeat-removed-item"]')?.textContent).toBe(
+      'Biscoito Recheado Chocolate 140g removido (inativo)',
+    )
+    expect(el.textContent).not.toContain('P022')
+    expect(el.textContent).not.toContain('P001')
+    expect(el.textContent).not.toContain('P006')
+
+    const rice = cartLine(el, 'P001')
+    expect(rice.textContent).toContain('Arroz Branco Tipo 1 5kg')
+    expect(normalizeBRL(rice.textContent ?? '')).toContain(normalizeBRL(formatBRL(2690)))
+    expect((rice.querySelector('[data-testid="cart-units"]') as HTMLInputElement).value).toBe('10')
+    expect((rice.querySelector('[data-testid="cart-discount"]') as HTMLInputElement).value).toBe(
+      '0',
+    )
+
+    const pasta = cartLine(el, 'P006')
+    expect(pasta.textContent).toContain('Macarrão Espaguete 500g')
+    expect((pasta.querySelector('[data-testid="cart-units"]') as HTMLInputElement).value).toBe('40')
+    expect((pasta.querySelector('[data-testid="cart-lots"]') as HTMLInputElement).value).toBe('2')
+    expect((pasta.querySelector('[data-testid="cart-discount"]') as HTMLInputElement).value).toBe(
+      '0',
+    )
+  })
+
+  it('item só múltiplo com fator 12 e 30 un vem com 3 lotes e a mensagem da API', async () => {
+    fetchSellerCustomers.mockResolvedValue(v01Wallet)
+    fetchCustomerOrders.mockResolvedValue([
+      { id: 'PH-FACTOR-MULT', date: '2026-10-20', status: 'Faturado', total: 9870 },
+    ])
+    repeatCustomerOrder.mockResolvedValue({
+      lines: [
+        {
+          productId: 'P006',
+          product: { ...p006, packFactor: 12 },
+          quantityUnits: 36,
+          discountPercent: 0,
+          lots: 3,
+        },
+      ],
+      removed: [],
+      notices: [
+        {
+          code: 'PACK_FACTOR_CHANGED',
+          productId: 'P006',
+          description: 'Macarrão Espaguete 500g',
+          newFactor: 12,
+          lots: 3,
+          units: 36,
+          message:
+            'A quantidade de unidades por lote mudou para 12; a quantidade foi ajustada para 3 lote(s) (36 unidades)',
+        },
+      ],
+    })
+
+    const el = await render('C001')
+    await waitForText(el, 'Mercadinho São José')
+    await waitForText(el, '20/10/2026')
+
+    const repeat = historyRow(el, 'PH-FACTOR-MULT').querySelector(
+      '[data-testid="repeat-order"]',
+    ) as HTMLButtonElement
+    repeat.click()
+    await waitForText(
+      el,
+      'A quantidade de unidades por lote mudou para 12; a quantidade foi ajustada para 3 lote(s) (36 unidades)',
+    )
+
+    const line = cartLine(el, 'P006')
+    expect((line.querySelector('[data-testid="cart-units"]') as HTMLInputElement).value).toBe('36')
+    expect((line.querySelector('[data-testid="cart-lots"]') as HTMLInputElement).value).toBe('3')
+    expect(line.querySelector('[data-testid="cart-line-notice"]')?.textContent).toBe(
+      'A quantidade de unidades por lote mudou para 12; a quantidade foi ajustada para 3 lote(s) (36 unidades)',
+    )
+    expect(el.textContent).not.toContain('P006')
+  })
+
+  it('item não só múltiplo com fator alterado mantém as unidades, Lote vazio e a mensagem', async () => {
+    fetchSellerCustomers.mockResolvedValue(v01Wallet)
+    fetchCustomerOrders.mockResolvedValue([
+      { id: 'PH-FACTOR-UNIT', date: '2026-10-21', status: 'Faturado', total: 5033 },
+    ])
+    repeatCustomerOrder.mockResolvedValue({
+      lines: [
+        {
+          productId: 'P004',
+          product: { ...p004, packFactor: 12 },
+          quantityUnits: 7,
+          discountPercent: 0,
+          lots: null,
+        },
+      ],
+      removed: [],
+      notices: [
+        {
+          code: 'LOT_NOT_EXACT',
+          productId: 'P004',
+          description: 'Óleo de Soja 900ml',
+          newFactor: 12,
+          lots: null,
+          units: 7,
+          message:
+            'As unidades do histórico não fecham um lote com o fator atual (12); o campo Lote ficou vazio.',
+        },
+      ],
+    })
+
+    const el = await render('C001')
+    await waitForText(el, 'Mercadinho São José')
+    await waitForText(el, '21/10/2026')
+
+    const repeat = historyRow(el, 'PH-FACTOR-UNIT').querySelector(
+      '[data-testid="repeat-order"]',
+    ) as HTMLButtonElement
+    repeat.click()
+    await waitForText(el, 'o campo Lote ficou vazio')
+
+    const line = cartLine(el, 'P004')
+    expect((line.querySelector('[data-testid="cart-units"]') as HTMLInputElement).value).toBe('7')
+    expect((line.querySelector('[data-testid="cart-lots"]') as HTMLInputElement).value).toBe('')
+    expect(line.querySelector('[data-testid="cart-line-notice"]')?.textContent).toContain(
+      'As unidades do histórico não fecham um lote com o fator atual (12)',
+    )
+    expect(el.textContent).not.toContain('P004')
+  })
+
+  it('confirma antes de sobrescrever o rascunho: cancelar mantém os itens', async () => {
+    const el = await openC001WithHistory()
+    await addFromSearch(el, p001)
+    expect(cartLine(el, 'P001')).not.toBeNull()
+
+    const repeat = historyRow(el, 'PH001').querySelector(
+      '[data-testid="repeat-order"]',
+    ) as HTMLButtonElement
+    repeat.click()
+    await nextTick()
+
+    const confirm = el.querySelector('[data-testid="overwrite-confirm"]')
+    expect(confirm?.textContent).toContain('substitui o rascunho atual')
+    expect(repeatCustomerOrder).not.toHaveBeenCalled()
+
+    const cancel = el.querySelector('[data-testid="overwrite-cancel"]') as HTMLButtonElement
+    cancel.click()
+    await nextTick()
+
+    expect(el.querySelector('[data-testid="overwrite-confirm"]')).toBeNull()
+    expect(repeatCustomerOrder).not.toHaveBeenCalled()
+    expect(cartLine(el, 'P001')).not.toBeNull()
+    expect(el.querySelector('[data-testid="repeat-removed"]')).toBeNull()
+  })
+
+  it('confirma antes de sobrescrever o rascunho: aceitar carrega o repeat', async () => {
+    const el = await openC001WithHistory()
+    await addFromSearch(el, p001)
+    repeatCustomerOrder.mockResolvedValue(ph001Repeat)
+
+    const repeat = historyRow(el, 'PH001').querySelector(
+      '[data-testid="repeat-order"]',
+    ) as HTMLButtonElement
+    repeat.click()
+    await nextTick()
+    expect(repeatCustomerOrder).not.toHaveBeenCalled()
+
+    const accept = el.querySelector('[data-testid="overwrite-accept"]') as HTMLButtonElement
+    accept.click()
+    await waitForText(el, 'Biscoito Recheado Chocolate 140g removido (inativo)')
+
+    expect(repeatCustomerOrder).toHaveBeenCalledTimes(1)
+    expect(repeatCustomerOrder).toHaveBeenCalledWith('C001', 'PH001')
+    expect(cartLine(el, 'P006')).not.toBeNull()
+    expect(
+      (cartLine(el, 'P001').querySelector('[data-testid="cart-discount"]') as HTMLInputElement)
+        .value,
+    ).toBe('0')
+  })
+
+  it('repetir não chama POST /orders', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const el = await openC001WithHistory()
+    repeatCustomerOrder.mockResolvedValue(ph001Repeat)
+
+    const repeat = historyRow(el, 'PH001').querySelector(
+      '[data-testid="repeat-order"]',
+    ) as HTMLButtonElement
+    repeat.click()
+    await waitForText(el, 'Pedido carregado para revisão')
+
+    expect(repeatCustomerOrder).toHaveBeenCalledWith('C001', 'PH001')
+    expect(fetchMock).not.toHaveBeenCalled()
+    const orderCalls = fetchMock.mock.calls.filter((call) => {
+      const url = String(call[0])
+      return url.includes('/orders') && !url.includes('/repeat')
+    })
+    expect(orderCalls).toEqual([])
+  })
+
+  it('mostra o mesmo 404 quando o histórico responde 403, sem mudar a URL', async () => {
+    fetchSellerCustomers.mockResolvedValue(v01Wallet)
+    fetchCustomerOrders.mockRejectedValue(new ApiError(403, 'outra carteira'))
+    const el = await render('C001')
+    await waitForText(el, 'Página não encontrada')
+    expect(el.textContent).toContain('Esse endereço não existe')
+    expect(router?.currentRoute.value.path).toBe('/clientes/C001/pedido')
+  })
+
+  it('mostra o mesmo 404 quando o repeat responde 404, sem mudar a URL', async () => {
+    const el = await openC001WithHistory()
+    repeatCustomerOrder.mockRejectedValue(new ApiError(404, 'Pedido não encontrado'))
+    const repeat = historyRow(el, 'PH001').querySelector(
+      '[data-testid="repeat-order"]',
+    ) as HTMLButtonElement
+    repeat.click()
+    await waitForText(el, 'Página não encontrada')
+    expect(router?.currentRoute.value.path).toBe('/clientes/C001/pedido')
   })
 })
