@@ -30,7 +30,7 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | Fase                              | Tarefas | `[x]` |
 | --------------------------------- | ------- | ----- |
 | F0 — Base (scaffold + docs)       | 1       | 1     |
-| F1 — Regras puras (`shared`)      | 9       | 6     |
+| F1 — Regras puras (`shared`)      | 9       | 8     |
 | F2 — Banco e seed                 | 1       | 0     |
 | F3 — API (req. 1–5, 7)            | 6       | 0     |
 | F4 — Telas (req. 1–5, 7)          | 5       | 0     |
@@ -38,7 +38,7 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | F6 — Supervisor (fecha req. 5)    | 2       | 0     |
 | F7 — Offline parcial (req. 9)     | 2       | 0     |
 | F8 — Entrega e docs               | 4       | 0     |
-| **Total**                         | **32**  | **7** |
+| **Total**                         | **32**  | **9** |
 | Opcionais                         | 3       | 0     |
 
 > Sem estimativas de tempo: com IA acelerando a implementação, elas não refletem dados reais. Prioridade: núcleo (F1–F4 + F8, req. 1–7) primeiro. Se o prazo apertar, corte na ordem: opcionais → F7 → F6 (T-25) → F5, e registre em README "o que ficou de fora".
@@ -117,7 +117,7 @@ Consumir `@yandeh/shared` hoje exige `pnpm --filter @yandeh/shared build` antes:
 - **Validação manual:** `pnpm --filter @yandeh/shared build` e script tsx: linha PH001/P006 `{ quantityUnits: 40, unitPrice: 329, discountPercent: 2 }` → `{ gross: 13160, discount: 263, net: 12897 }`; pedido exemplo C001/TP01 (P001 10×2690 0%, P006 40×333 2%, P010 24×499 0%) → `{ gross: 52196, discount: 266, net: 51930 }`; o mesmo com arroz a 6% → desconto da linha P001 = 1614 e totais `{ discount: 1880, net: 50316 }`. Evidência: saída do script.
 - **Commit:** `feat(shared): totais por linha e do pedido em centavos`
 
-### [ ] T-06 — Alçada pelo maior desconto e status
+### [x] T-06 — Alçada pelo maior desconto e status
 
 - **Refs:** RN10; D7; A9; R5.
 - **Depende de:** T-05
@@ -126,7 +126,7 @@ Consumir `@yandeh/shared` hoje exige `pnpm --filter @yandeh/shared build` antes:
 - **Validação manual:** `pnpm --filter @yandeh/shared build` e script tsx: `maxDiscount` das linhas 0%, 2%, 6% → 6; `statusForDiscount` com alçada V01=5 e essas linhas → `'Aguardando aprovação'`; V01 (5%) com 0/2/5% → `'Enviado'`; V02 (7%) com item a 7% → `'Enviado'` (`>` estrito). Evidência: saída do script.
 - **Commit:** `feat(shared): status do pedido pela alçada do maior desconto`
 
-### [ ] T-07 — Crédito disponível com reserva de pendentes
+### [x] T-07 — Crédito disponível com reserva de pendentes
 
 - **Refs:** RN09; D10; A11, A12, A19; R7.
 - **Depende de:** T-01

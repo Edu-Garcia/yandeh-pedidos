@@ -9,8 +9,3 @@ describe('constantes', () => {
     expect(FALLBACK_PRICE_TABLE_ID).toBe('TP01')
   })
 })
-
-describe('statusForDiscount', () => {
-  it.todo('V01 (alçada 5%) com item a 6% => Aguardando aprovação')
-  it.todo('V01 com todos os itens <= 5% => Enviado')
-})
