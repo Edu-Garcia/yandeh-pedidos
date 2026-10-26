@@ -30,7 +30,7 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | Fase                              | Tarefas | `[x]` |
 | --------------------------------- | ------- | ----- |
 | F0 — Base (scaffold + docs)       | 1       | 1     |
-| F1 — Regras puras (`shared`)      | 9       | 4     |
+| F1 — Regras puras (`shared`)      | 9       | 5     |
 | F2 — Banco e seed                 | 1       | 0     |
 | F3 — API (req. 1–5, 7)            | 6       | 0     |
 | F4 — Telas (req. 1–5, 7)          | 5       | 0     |
@@ -38,7 +38,7 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | F6 — Supervisor (fecha req. 5)    | 2       | 0     |
 | F7 — Offline parcial (req. 9)     | 2       | 0     |
 | F8 — Entrega e docs               | 4       | 0     |
-| **Total**                         | **32**  | **5** |
+| **Total**                         | **32**  | **6** |
 | Opcionais                         | 3       | 0     |
 
 > Sem estimativas de tempo: com IA acelerando a implementação, elas não refletem dados reais. Prioridade: núcleo (F1–F4 + F8, req. 1–7) primeiro. Se o prazo apertar, corte na ordem: opcionais → F7 → F6 (T-25) → F5, e registre em README "o que ficou de fora".
@@ -108,7 +108,7 @@ Consumir `@yandeh/shared` hoje exige `pnpm --filter @yandeh/shared build` antes:
 - **Validação manual:** `pnpm --filter @yandeh/shared build` e script tsx: `unitsFromLots(2, 20) === 40` (P006 Macarrão Espaguete 500g, FD 20); `lotsFromUnits(40, 20) === 2`; `lotsFromUnits(7, 20) === null` (P004 Óleo de Soja 900ml); `lotsFromUnits(20, 20) === 1`; `isValidQuantity` P006 40 → true, 30 → false; `isUnitsReadOnly(P006)` → true; P010 Leite UHT (CX 12, só múltiplo) 24 → true; 0, -1 e 1,5 → false; P001 (UN fator 1) → `hasLotField === false`. Evidência: saída do script.
 - **Commit:** `feat(shared): conversão unidades/lote e validação de múltiplos`
 
-### [ ] T-05 — Totais por linha e do pedido (arredondamento por linha)
+### [x] T-05 — Totais por linha e do pedido (arredondamento por linha)
 
 - **Refs:** RN06, RN07; D7, D8; R4.
 - **Depende de:** T-01

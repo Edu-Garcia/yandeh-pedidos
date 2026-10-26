@@ -10,10 +10,6 @@ describe('constantes', () => {
   })
 })
 
-describe('lineTotals', () => {
-  it.todo('arredonda por linha em centavos (PH001/P006: 40 x R$3,29 com 2% => líquido 12897)')
-})
-
 describe('statusForDiscount', () => {
   it.todo('V01 (alçada 5%) com item a 6% => Aguardando aprovação')
   it.todo('V01 com todos os itens <= 5% => Enviado')
