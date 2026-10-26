@@ -1,9 +1,12 @@
 import { availableCredit, orderTotals, reservedCredit } from '@yandeh/shared'
 import { asc, eq, inArray } from 'drizzle-orm'
 import type { Db } from './client.js'
-import { pedidos, pedidosItens } from './schema.js'
+import { clientes, pedidos, pedidosItens } from './schema.js'
 
-export async function pendingNetsByCustomer(database: Db, customerIds: string[]) {
+/** `db` ou o `tx` de `database.transaction` — ambos expõem `select`. */
+export type CreditReader = Pick<Db, 'select'>
+
+export async function pendingNetsByCustomer(database: CreditReader, customerIds: string[]) {
   const byCustomer = new Map<string, Array<{ status: string; net: number }>>()
   if (customerIds.length === 0) {
     return byCustomer
@@ -66,9 +69,24 @@ export async function pendingNetsByCustomer(database: Db, customerIds: string[])
   return byCustomer
 }
 
-/** Crédito disponível do cliente (RN09) sem lock — transação FOR UPDATE fica na T-15. */
+/** Trava a linha do cliente (RN09) para a transação de crédito. */
+export async function lockCustomerForUpdate(database: CreditReader, customerId: string) {
+  const [row] = await database
+    .select({
+      id: clientes.id,
+      creditLimit: clientes.limiteCreditoCentavos,
+      creditUsed: clientes.creditoUtilizadoCentavos,
+    })
+    .from(clientes)
+    .where(eq(clientes.id, customerId))
+    .for('update')
+
+  return row
+}
+
+/** Crédito disponível do cliente (RN09) — chamar depois do lock na T-15. */
 export async function availableCreditForCustomer(
-  database: Db,
+  database: CreditReader,
   customer: { id: string; creditLimit: number; creditUsed: number },
 ) {
   const pending = await pendingNetsByCustomer(database, [customer.id])
