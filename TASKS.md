@@ -31,14 +31,14 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | --------------------------------- | ------- | ------ |
 | F0 — Base (scaffold + docs)       | 1       | 1      |
 | F1 — Regras puras (`shared`)      | 9       | 9      |
-| F2 — Banco e seed                 | 1       | 0      |
+| F2 — Banco e seed                 | 1       | 1      |
 | F3 — API (req. 1–5, 7)            | 6       | 0      |
 | F4 — Telas (req. 1–5, 7)          | 5       | 0      |
 | F5 — Histórico e repetir (req. 8) | 2       | 0      |
 | F6 — Supervisor (fecha req. 5)    | 2       | 0      |
 | F7 — Offline parcial (req. 9)     | 2       | 0      |
 | F8 — Entrega e docs               | 4       | 0      |
-| **Total**                         | **32**  | **10** |
+| **Total**                         | **32**  | **11** |
 | Opcionais                         | 3       | 0      |
 
 > Sem estimativas de tempo: com IA acelerando a implementação, elas não refletem dados reais. Prioridade: núcleo (F1–F4 + F8, req. 1–7) primeiro. Se o prazo apertar, corte na ordem: opcionais → F7 → F6 (T-25) → F5, e registre em README "o que ficou de fora".
@@ -156,7 +156,7 @@ Consumir `@yandeh/shared` hoje exige `pnpm --filter @yandeh/shared build` antes:
 
 ## F2 — Banco e seed
 
-### [ ] T-10 — Revisar schema/seed para status, reserva e idempotência
+### [x] T-10 — Revisar schema/seed para status, reserva e idempotência
 
 - **Refs:** PRD §9; RN09, RN11, RN13.
 - **Depende de:** T-00

@@ -144,6 +144,8 @@ await db.transaction(async (tx) => {
         vendedorId: p.vendedor_id,
         data: p.data,
         status: p.status,
+        // Histórico não tem chave de envio; UNIQUE permite vários NULL (PH00x).
+        idempotencyKey: null,
       })),
     )
     .onConflictDoNothing()
