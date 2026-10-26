@@ -1,4 +1,4 @@
-import type { Product } from './types'
+import type { Product } from './types.js'
 
 /**
  * Unidades correspondentes a N lotes (RN05 / D9).

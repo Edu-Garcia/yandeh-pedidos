@@ -1,4 +1,4 @@
-import type { Cents, Customer } from './types'
+import type { Cents, Customer } from './types.js'
 
 /**
  * Soma o líquido dos pedidos que reservam crédito (RN09 / D10 / A11 / A12).

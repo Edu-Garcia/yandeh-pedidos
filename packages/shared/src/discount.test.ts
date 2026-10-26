@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { toCents } from './money'
-import { maxDiscount, statusForDiscount } from './discount'
-import type { OrderLineInput, Seller } from './types'
+import { toCents } from './money.js'
+import { maxDiscount, statusForDiscount } from './discount.js'
+import type { OrderLineInput, Seller } from './types.js'
 
 function line(
   productId: string,

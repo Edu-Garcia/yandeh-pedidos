@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FALLBACK_PRICE_TABLE_ID, MINIMUM_ORDER_CENTS } from './rules'
+import { FALLBACK_PRICE_TABLE_ID, MINIMUM_ORDER_CENTS } from './rules.js'
 
 describe('constantes', () => {
   it('pedido mínimo é R$ 300,00 em centavos', () => {

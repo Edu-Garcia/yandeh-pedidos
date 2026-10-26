@@ -1,4 +1,4 @@
-import type { Cents } from './types'
+import type { Cents } from './types.js'
 
 const brlFormatter = new Intl.NumberFormat('pt-BR', {
   style: 'currency',

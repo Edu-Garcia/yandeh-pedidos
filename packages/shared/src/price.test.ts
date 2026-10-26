@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { toCents } from './money'
-import { unitPriceFor, resolvePriceTableId } from './price'
-import { FALLBACK_PRICE_TABLE_ID } from './rules'
-import type { Customer, PriceItem } from './types'
+import { toCents } from './money.js'
+import { unitPriceFor, resolvePriceTableId } from './price.js'
+import { FALLBACK_PRICE_TABLE_ID } from './rules.js'
+import type { Customer, PriceItem } from './types.js'
 
 const customerC004: Customer = {
   id: 'C004',

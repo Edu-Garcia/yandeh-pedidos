@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatBRL, toCents } from './money'
+import { formatBRL, toCents } from './money.js'
 
 /** Intl pt-BR pode emitir NBSP/NNBSP entre "R$" e o valor. */
 function normalizeBRL(value: string): string {

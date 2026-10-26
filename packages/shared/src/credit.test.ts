@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { availableCredit, reservedCredit } from './credit'
-import { toCents } from './money'
-import type { Cents, Customer } from './types'
+import { availableCredit, reservedCredit } from './credit.js'
+import { toCents } from './money.js'
+import type { Cents, Customer } from './types.js'
 
 function order(status: string, net: Cents): { status: string; net: Cents } {
   return { status, net }

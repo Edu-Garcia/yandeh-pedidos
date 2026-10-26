@@ -5,8 +5,8 @@ import {
   isValidQuantity,
   lotsFromUnits,
   unitsFromLots,
-} from './packaging'
-import type { Product } from './types'
+} from './packaging.js'
+import type { Product } from './types.js'
 
 /** P001 Arroz Branco Tipo 1 5kg — UN fator 1, venda unitária (seed). */
 const productP001: Product = {

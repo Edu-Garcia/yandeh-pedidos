@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { formatBRL, toCents } from './money'
-import { lineTotals, orderTotals } from './totals'
-import type { OrderLineInput } from './types'
+import { formatBRL, toCents } from './money.js'
+import { lineTotals, orderTotals } from './totals.js'
+import type { OrderLineInput } from './types.js'
 
 /** Intl pt-BR pode emitir NBSP/NNBSP entre "R$" e o valor. */
 function normalizeBRL(value: string): string {

@@ -1,5 +1,5 @@
-import type { Cents, Customer, EffectivePriceTable, PriceItem, Product } from './types'
-import { FALLBACK_PRICE_TABLE_ID } from './rules'
+import type { Cents, Customer, EffectivePriceTable, PriceItem, Product } from './types.js'
+import { FALLBACK_PRICE_TABLE_ID } from './rules.js'
 
 /**
  * Tabela efetiva do cliente (RN02 / D11 / A2).
