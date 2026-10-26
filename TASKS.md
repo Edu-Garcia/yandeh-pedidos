@@ -33,12 +33,12 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | F1 — Regras puras (`shared`)      | 9       | 9      |
 | F2 — Banco e seed                 | 1       | 1      |
 | F3 — API (req. 1–5, 7)            | 8       | 8      |
-| F4 — Telas (req. 1–5, 7)          | 5       | 1      |
+| F4 — Telas (req. 1–5, 7)          | 5       | 2      |
 | F5 — Histórico e repetir (req. 8) | 2       | 0      |
 | F6 — Supervisor (fecha req. 5)    | 2       | 0      |
 | F7 — Offline parcial (req. 9)     | 2       | 0      |
 | F8 — Entrega e docs               | 4       | 0      |
-| **Total**                         | **34**  | **20** |
+| **Total**                         | **34**  | **21** |
 | Opcionais                         | 3       | 0      |
 
 > Sem estimativas de tempo: com IA acelerando a implementação, elas não refletem dados reais. Prioridade: núcleo (F1–F4 + F8, req. 1–7) primeiro. Se o prazo apertar, corte na ordem: opcionais → F7 → F6 (T-25) → F5, e registre em README "o que ficou de fora".
@@ -265,13 +265,15 @@ Validação comum: `pnpm --filter @yandeh/web typecheck && pnpm --filter @yandeh
 - **Commit:** `feat(web): login simulado com seleção de vendedor`
 - **Status:** feito
 
-### [ ] T-18 — Tela "Minha carteira"
+### [x] T-18 — Tela "Minha carteira"
 
 - **Refs:** RN01, RN02, RN09; PRD §7.2; R1.
 - **Depende de:** T-12, T-17
 - **Aceite:** V01 vê C001–C004 com cidade/UF; badge "Padrão (fallback)" no C004; crédito em BRL; destaque em clientes com crédito < mínimo (V02 → C006; V03 → C010).
-- **Validação manual:** Com a app no ar, logar V01 → "Minha carteira" lista só C001 Mercadinho São José (Fortaleza/CE), C002 Minibox Bom Preço (Fortaleza/CE), C003 Conveniência Esquina (Caucaia/CE), C004 Mercearia Dona Lúcia (Maracanaú/CE); C004 com badge "Padrão (fallback)"; créditos em BRL (C001 R$ 3.800,00; C002 R$ 350,00). Logar V02 → C006 Mercadinho Central em destaque (crédito R$ 100,00 < mínimo). Logar V03 → C010 Conveniência 24h Posto Sol em destaque (R$ 0,00). Evidência: screenshots das três carteiras.
+- **Validação:** `pnpm --filter @yandeh/web typecheck && pnpm --filter @yandeh/web build`; `pnpm --filter @yandeh/web test` (formatação, destaque abaixo do mínimo e renderização com API mockada).
+- **Validação manual:** `docker compose down -v && docker compose up --build`. Viewport ~390 px. Logar V01 → "Minha carteira" lista só C001 Mercadinho São José (Fortaleza/CE), C002 Minibox Bom Preço (Fortaleza/CE), C003 Conveniência Esquina (Caucaia/CE), C004 Mercearia Dona Lúcia (Maracanaú/CE); C004 com badge "Padrão (fallback)"; créditos em BRL (C001 R$ 3.800,00; C002 R$ 350,00). Logar V02 → C006 Mercadinho Central em destaque (crédito R$ 100,00 < mínimo). Logar V03 → C010 Conveniência 24h Posto Sol em destaque (R$ 0,00). Evidência: screenshots das três carteiras (artifacts, fora do repo).
 - **Commit:** `feat(web): carteira do vendedor com tabela e crédito`
+- **Status:** feito
 
 ### [ ] T-19 — Pedido: busca de produtos
 

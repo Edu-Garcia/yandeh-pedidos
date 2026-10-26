@@ -47,7 +47,7 @@ Variáveis da API (ver `.env.example` e `docker-compose.yml`): `DATABASE_URL`, `
 ## Como testar
 
 ```bash
-pnpm test        # Vitest em packages/shared, apps/api e apps/web (sessão e guard)
+pnpm test        # Vitest em packages/shared, apps/api e apps/web (sessão, guard e carteira)
 pnpm typecheck
 pnpm lint
 pnpm format:check
