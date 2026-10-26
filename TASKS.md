@@ -33,12 +33,12 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | F1 — Regras puras (`shared`)      | 9       | 9      |
 | F2 — Banco e seed                 | 1       | 1      |
 | F3 — API (req. 1–5, 7)            | 8       | 8      |
-| F4 — Telas (req. 1–5, 7)          | 5       | 4      |
+| F4 — Telas (req. 1–5, 7)          | 5       | 5      |
 | F5 — Histórico e repetir (req. 8) | 2       | 0      |
 | F6 — Supervisor (fecha req. 5)    | 2       | 0      |
 | F7 — Offline parcial (req. 9)     | 2       | 0      |
 | F8 — Entrega e docs               | 4       | 0      |
-| **Total**                         | **34**  | **23** |
+| **Total**                         | **34**  | **24** |
 | Opcionais                         | 3       | 0      |
 
 > Sem estimativas de tempo: com IA acelerando a implementação, elas não refletem dados reais. Prioridade: núcleo (F1–F4 + F8, req. 1–7) primeiro. Se o prazo apertar, corte na ordem: opcionais → F7 → F6 (T-25) → F5, e registre em README "o que ficou de fora".
@@ -296,7 +296,7 @@ Validação comum: `pnpm --filter @yandeh/web typecheck && pnpm --filter @yandeh
 - **Commit:** `feat(web): carrinho com campos unidades e lote interligados`
 - **Status:** feito
 
-### [ ] T-21 — Pedido: totais, bloqueios e envio
+### [x] T-21 — Pedido: totais, bloqueios e envio
 
 - **Refs:** RN07–RN10; R4, R5, R7.
 - **Depende de:** T-20, T-14, T-08
@@ -304,6 +304,7 @@ Validação comum: `pnpm --filter @yandeh/web typecheck && pnpm --filter @yandeh
 - **Aceite:** exemplo C001 mostra R$ 521,96 / R$ 2,66 / R$ 519,30 e envia como "Enviado"; arroz 6% mostra aviso e resulta "Aguardando aprovação"; C002 com R$ 400 → bloqueio de crédito; < R$ 300 → bloqueio de mínimo.
 - **Validação manual:** No pedido C001, montar o exemplo (P001 10 un 0%, P006 40 un 2%, P010 24 un 0%) → painel R$ 521,96 / R$ 2,66 / R$ 519,30; sem bloqueios; Enviar (com `Idempotency-Key`) → resultado "Enviado". Repetir com P001 a 6% → aviso "precisará de aprovação" e resultado "Aguardando aprovação". Em C002, itens que somem ~R$ 400 → bloqueio `INSUFFICIENT_CREDIT` e Enviar desabilitado. Líquido < R$ 300 → bloqueio `BELOW_MINIMUM`. Evidência: screenshots dos totais C001, do aviso de alçada e dos bloqueios.
 - **Commit:** `feat(web): totais, bloqueios e envio do pedido`
+- **Status:** feito
 
 ## F5 — Histórico e repetir (req. 8)
 
