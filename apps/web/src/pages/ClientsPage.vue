@@ -1,12 +1,15 @@
 <script setup lang="ts">
-// STUB — Lista apenas os clientes do vendedor logado (req. 1).
+import SessionBar from '@/components/SessionBar.vue'
 </script>
 
 <template>
-  <section>
-    <h1 class="text-xl font-semibold">Minha carteira</h1>
-    <p class="mt-2 text-sm text-neutral-500">
-      Em construção. Lista apenas os clientes do vendedor logado (req. 1).
-    </p>
-  </section>
+  <div class="min-h-dvh">
+    <SessionBar />
+    <section class="px-4 py-6">
+      <h1 class="font-display text-3xl text-counter">Minha carteira</h1>
+      <p class="mt-3 max-w-prose font-sans text-base text-steel">
+        Em construção. Lista apenas os clientes do vendedor logado.
+      </p>
+    </section>
+  </div>
 </template>
