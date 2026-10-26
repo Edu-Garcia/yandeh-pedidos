@@ -515,5 +515,211 @@ describe('POST /orders', () => {
     await app.close()
   })
 
-  it.todo('com a mesma Idempotency-Key retorna o pedido já criado')
+  it('sem Idempotency-Key retorna 400', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({
+      method: 'POST',
+      url: '/orders',
+      headers: {
+        'x-seller-id': 'V01',
+        'content-type': 'application/json',
+      },
+      payload: { customerId: 'C001', items: exampleC001Items },
+    })
+
+    expect(res.statusCode).toBe(400)
+    expect(res.json()).toEqual({
+      message: 'Cabeçalho Idempotency-Key é obrigatório e deve ser um UUID',
+    })
+    const extras = await db.select().from(pedidos).where(notInArray(pedidos.id, SEED_ORDER_IDS))
+    expect(extras).toHaveLength(0)
+    await app.close()
+  })
+
+  it('Idempotency-Key inválida retorna 400', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({
+      method: 'POST',
+      url: '/orders',
+      headers: {
+        'x-seller-id': 'V01',
+        'content-type': 'application/json',
+        'idempotency-key': 'nao-e-uuid',
+      },
+      payload: { customerId: 'C001', items: exampleC001Items },
+    })
+
+    expect(res.statusCode).toBe(400)
+    expect(res.json()).toEqual({
+      message: 'Cabeçalho Idempotency-Key é obrigatório e deve ser um UUID',
+    })
+    await app.close()
+  })
+
+  it('com a mesma Idempotency-Key retorna o pedido já criado', async () => {
+    const app = buildApp(db)
+    const key = randomUUID()
+    const headers = {
+      'x-seller-id': 'V01',
+      'content-type': 'application/json',
+      'idempotency-key': key,
+    }
+    const payload = { customerId: 'C001', items: exampleC001Items }
+
+    const first = await app.inject({ method: 'POST', url: '/orders', headers, payload })
+    expect(first.statusCode).toBe(201)
+    const created = first.json() as { id: string; totals: { net: number } }
+
+    const second = await app.inject({ method: 'POST', url: '/orders', headers, payload })
+    expect(second.statusCode).toBe(200)
+    expect(second.json()).toEqual(created)
+
+    const extras = await db.select().from(pedidos).where(eq(pedidos.idempotencyKey, key))
+    expect(extras).toHaveLength(1)
+    expect(extras[0]?.id).toBe(created.id)
+
+    const [c001] = await db
+      .select({ creditUsed: clientes.creditoUtilizadoCentavos })
+      .from(clientes)
+      .where(eq(clientes.id, 'C001'))
+    expect(c001?.creditUsed).toBe(SEED_CREDIT_USED.C001 + 51930)
+    await app.close()
+  })
+
+  it('mesma chave de outro vendedor retorna 409 sem gravar nem alterar crédito', async () => {
+    const app = buildApp(db)
+    const key = randomUUID()
+    const first = await app.inject({
+      method: 'POST',
+      url: '/orders',
+      headers: {
+        'x-seller-id': 'V01',
+        'content-type': 'application/json',
+        'idempotency-key': key,
+      },
+      payload: { customerId: 'C001', items: exampleC001Items },
+    })
+    expect(first.statusCode).toBe(201)
+
+    const conflict = await app.inject({
+      method: 'POST',
+      url: '/orders',
+      headers: {
+        'x-seller-id': 'V02',
+        'content-type': 'application/json',
+        'idempotency-key': key,
+      },
+      payload: { customerId: 'C005', items: exampleC001Items },
+    })
+    expect(conflict.statusCode).toBe(409)
+    expect(conflict.json()).toEqual({
+      message: 'Idempotency-Key já foi usada em outro pedido',
+      code: 'IDEMPOTENCY_KEY_CONFLICT',
+    })
+    expect(conflict.json()).not.toHaveProperty('id')
+
+    const extras = await db.select().from(pedidos).where(eq(pedidos.idempotencyKey, key))
+    expect(extras).toHaveLength(1)
+    expect(extras[0]?.clienteId).toBe('C001')
+    expect(extras[0]?.vendedorId).toBe('V01')
+
+    const [c001, c005] = await Promise.all([
+      db
+        .select({ creditUsed: clientes.creditoUtilizadoCentavos })
+        .from(clientes)
+        .where(eq(clientes.id, 'C001')),
+      db
+        .select({ creditUsed: clientes.creditoUtilizadoCentavos })
+        .from(clientes)
+        .where(eq(clientes.id, 'C005')),
+    ])
+    expect(c001[0]?.creditUsed).toBe(SEED_CREDIT_USED.C001 + 51930)
+    expect(c005[0]?.creditUsed).toBe(SEED_CREDIT_USED.C005)
+    await app.close()
+  })
+
+  it('mesma chave para outro cliente do mesmo vendedor retorna 409 sem gravar nem alterar crédito', async () => {
+    const app = buildApp(db)
+    const key = randomUUID()
+    const first = await app.inject({
+      method: 'POST',
+      url: '/orders',
+      headers: {
+        'x-seller-id': 'V01',
+        'content-type': 'application/json',
+        'idempotency-key': key,
+      },
+      payload: { customerId: 'C001', items: exampleC001Items },
+    })
+    expect(first.statusCode).toBe(201)
+
+    const conflict = await app.inject({
+      method: 'POST',
+      url: '/orders',
+      headers: {
+        'x-seller-id': 'V01',
+        'content-type': 'application/json',
+        'idempotency-key': key,
+      },
+      payload: { customerId: 'C003', items: exampleC001Items },
+    })
+    expect(conflict.statusCode).toBe(409)
+    expect(conflict.json()).toEqual({
+      message: 'Idempotency-Key já foi usada em outro pedido',
+      code: 'IDEMPOTENCY_KEY_CONFLICT',
+    })
+    expect(conflict.json()).not.toHaveProperty('id')
+
+    const extras = await db.select().from(pedidos).where(eq(pedidos.idempotencyKey, key))
+    expect(extras).toHaveLength(1)
+    expect(extras[0]?.clienteId).toBe('C001')
+
+    const [c001, c003] = await Promise.all([
+      db
+        .select({ creditUsed: clientes.creditoUtilizadoCentavos })
+        .from(clientes)
+        .where(eq(clientes.id, 'C001')),
+      db
+        .select({ creditUsed: clientes.creditoUtilizadoCentavos })
+        .from(clientes)
+        .where(eq(clientes.id, 'C003')),
+    ])
+    expect(c001[0]?.creditUsed).toBe(SEED_CREDIT_USED.C001 + 51930)
+    expect(c003[0]?.creditUsed).toBe(SEED_CREDIT_USED.C003)
+    await app.close()
+  })
+
+  it('dois POSTs concorrentes com a mesma chave: uma linha e o mesmo id', async () => {
+    const app = buildApp(db)
+    const key = randomUUID()
+    const headers = {
+      'x-seller-id': 'V01',
+      'content-type': 'application/json',
+      'idempotency-key': key,
+    }
+    const payload = { customerId: 'C001', items: exampleC001Items }
+
+    const [first, second] = await Promise.all([
+      app.inject({ method: 'POST', url: '/orders', headers, payload }),
+      app.inject({ method: 'POST', url: '/orders', headers, payload }),
+    ])
+
+    const statuses = [first.statusCode, second.statusCode].sort()
+    expect(statuses).toEqual([200, 201])
+
+    const firstBody = first.json() as { id: string }
+    const secondBody = second.json() as { id: string }
+    expect(firstBody.id).toBe(secondBody.id)
+
+    const extras = await db.select().from(pedidos).where(eq(pedidos.idempotencyKey, key))
+    expect(extras).toHaveLength(1)
+    expect(extras[0]?.id).toBe(firstBody.id)
+
+    const [c001] = await db
+      .select({ creditUsed: clientes.creditoUtilizadoCentavos })
+      .from(clientes)
+      .where(eq(clientes.id, 'C001'))
+    expect(c001?.creditUsed).toBe(SEED_CREDIT_USED.C001 + 51930)
+    await app.close()
+  })
 })
