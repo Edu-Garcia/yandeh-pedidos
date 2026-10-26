@@ -1,9 +1,15 @@
-import { availableCredit, reservedCredit, resolvePriceTableId } from '@yandeh/shared'
+import {
+  availableCredit,
+  FALLBACK_PRICE_TABLE_ID,
+  reservedCredit,
+  resolvePriceTableId,
+} from '@yandeh/shared'
 import { asc, eq } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
 import type { FastifyInstance } from 'fastify'
 import type { Db } from '../db/client.js'
 import { pendingNetsByCustomer } from '../db/pending-credit.js'
-import { clientes, supervisores, vendedores } from '../db/schema.js'
+import { clientes, supervisores, tabelasPreco, vendedores } from '../db/schema.js'
 import {
   sellerCustomersResponseSchema,
   sellersResponseSchema,
@@ -50,6 +56,8 @@ export function registerIdentityRoutes(app: FastifyInstance, database: Db) {
       return reply.code(404).send({ message: 'Vendedor não encontrado' })
     }
 
+    const fallbackTable = alias(tabelasPreco, 'tabela_fallback')
+
     const customers = await database
       .select({
         id: clientes.id,
@@ -57,10 +65,14 @@ export function registerIdentityRoutes(app: FastifyInstance, database: Db) {
         city: clientes.cidade,
         uf: clientes.uf,
         priceTableId: clientes.tabelaPrecoId,
+        assignedTableName: tabelasPreco.nome,
+        fallbackTableName: fallbackTable.nome,
         creditLimit: clientes.limiteCreditoCentavos,
         creditUsed: clientes.creditoUtilizadoCentavos,
       })
       .from(clientes)
+      .leftJoin(tabelasPreco, eq(clientes.tabelaPrecoId, tabelasPreco.id))
+      .innerJoin(fallbackTable, eq(fallbackTable.id, FALLBACK_PRICE_TABLE_ID))
       .where(eq(clientes.vendedorId, sellerId))
       .orderBy(asc(clientes.id))
 
@@ -78,6 +90,9 @@ export function registerIdentityRoutes(app: FastifyInstance, database: Db) {
         city: customer.city,
         uf: customer.uf,
         priceTableId: table.tableId,
+        priceTableName: table.isFallback
+          ? customer.fallbackTableName
+          : (customer.assignedTableName ?? customer.fallbackTableName),
         isFallback: table.isFallback,
         availableCredit: availableCredit(
           { creditLimit: customer.creditLimit, creditUsed: customer.creditUsed },

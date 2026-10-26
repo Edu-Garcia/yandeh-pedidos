@@ -59,6 +59,8 @@ export interface SellerCustomer {
   uf: string
   /** Tabela efetiva (`resolvePriceTableId`), não o id cru do cadastro. */
   priceTableId: string
+  /** Nome em `tabelas_preco.nome` da tabela efetiva (no fallback, o da TP01). */
+  priceTableName: string
   isFallback: boolean
   availableCredit: Cents
 }

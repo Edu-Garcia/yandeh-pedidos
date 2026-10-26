@@ -1,4 +1,4 @@
-import type { Seller, Supervisor } from '@yandeh/shared'
+import type { Seller, SellerCustomer, Supervisor } from '@yandeh/shared'
 import { useSessionStore } from '@/stores/session'
 
 export const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3333'
@@ -34,4 +34,8 @@ export function fetchSellers(): Promise<Seller[]> {
 
 export function fetchSupervisors(): Promise<Supervisor[]> {
   return apiRequest<Supervisor[]>('/supervisors')
+}
+
+export function fetchSellerCustomers(sellerId: string): Promise<SellerCustomer[]> {
+  return apiRequest<SellerCustomer[]>(`/sellers/${sellerId}/customers`)
 }

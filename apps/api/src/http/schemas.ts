@@ -30,6 +30,7 @@ export const sellerCustomerSchema = z.object({
   city: z.string(),
   uf: z.string(),
   priceTableId: z.string(),
+  priceTableName: z.string(),
   isFallback: z.boolean(),
   availableCredit: z.number(),
 }) satisfies z.ZodType<SellerCustomer>
