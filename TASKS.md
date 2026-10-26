@@ -30,7 +30,7 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | Fase                              | Tarefas | `[x]` |
 | --------------------------------- | ------- | ----- |
 | F0 — Base (scaffold + docs)       | 1       | 1     |
-| F1 — Regras puras (`shared`)      | 9       | 5     |
+| F1 — Regras puras (`shared`)      | 9       | 6     |
 | F2 — Banco e seed                 | 1       | 0     |
 | F3 — API (req. 1–5, 7)            | 6       | 0     |
 | F4 — Telas (req. 1–5, 7)          | 5       | 0     |
@@ -38,7 +38,7 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | F6 — Supervisor (fecha req. 5)    | 2       | 0     |
 | F7 — Offline parcial (req. 9)     | 2       | 0     |
 | F8 — Entrega e docs               | 4       | 0     |
-| **Total**                         | **32**  | **6** |
+| **Total**                         | **32**  | **7** |
 | Opcionais                         | 3       | 0     |
 
 > Sem estimativas de tempo: com IA acelerando a implementação, elas não refletem dados reais. Prioridade: núcleo (F1–F4 + F8, req. 1–7) primeiro. Se o prazo apertar, corte na ordem: opcionais → F7 → F6 (T-25) → F5, e registre em README "o que ficou de fora".
@@ -135,7 +135,7 @@ Consumir `@yandeh/shared` hoje exige `pnpm --filter @yandeh/shared build` antes:
 - **Validação manual:** `pnpm --filter @yandeh/shared build` e script tsx com clientes do seed em centavos: C001 limite 500000 utilizado 120000 reservado 0 → `availableCredit` 380000; C002 1200000−1165000 → 35000; C006 400000−390000 → 10000; C010 450000−450000 → 0; C002 com `reservedCredit`/reservado 32000 → 3000. Evidência: saída do script.
 - **Commit:** `feat(shared): crédito disponível com reserva de pendentes`
 
-### [ ] T-08 — Agregado de bloqueios de envio (`validateOrder`)
+### [x] T-08 — Agregado de bloqueios de envio (`validateOrder`)
 
 - **Refs:** RN05, RN06, RN08, RN09; A10, A11; R4, R7.
 - **Depende de:** T-03, T-04, T-05, T-07

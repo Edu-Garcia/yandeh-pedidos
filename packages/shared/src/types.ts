@@ -69,9 +69,19 @@ export interface OrderTotals {
 
 export type OrderStatus = 'Enviado' | 'Aguardando aprovação' | 'Aprovado' | 'Rejeitado'
 
+/** Códigos estáveis de bloqueio de envio (PRD §8 / A24). Alçada não é erro. */
+export type ValidationIssueCode =
+  | 'EMPTY_ORDER'
+  | 'INVALID_QUANTITY'
+  | 'INVALID_DISCOUNT'
+  | 'PRODUCT_NOT_SELLABLE'
+  | 'BELOW_MINIMUM'
+  | 'INSUFFICIENT_CREDIT'
+
 export type ValidationIssue =
-  | { code: 'BELOW_MINIMUM_ORDER'; minimum: Cents; net: Cents }
-  | { code: 'INSUFFICIENT_CREDIT'; available: Cents; net: Cents }
-  | { code: 'INVALID_QUANTITY'; productId: string }
-  | { code: 'PRODUCT_NOT_SELLABLE'; productId: string }
-  | { code: 'EMPTY_ORDER' }
+  | { code: 'EMPTY_ORDER'; message: string }
+  | { code: 'INVALID_QUANTITY'; message: string; productId: string }
+  | { code: 'INVALID_DISCOUNT'; message: string; productId: string }
+  | { code: 'PRODUCT_NOT_SELLABLE'; message: string; productId: string }
+  | { code: 'BELOW_MINIMUM'; message: string; minimum: Cents; net: Cents }
+  | { code: 'INSUFFICIENT_CREDIT'; message: string; available: Cents; net: Cents }

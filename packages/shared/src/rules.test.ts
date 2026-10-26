@@ -14,9 +14,3 @@ describe('statusForDiscount', () => {
   it.todo('V01 (alçada 5%) com item a 6% => Aguardando aprovação')
   it.todo('V01 com todos os itens <= 5% => Enviado')
 })
-
-describe('validateOrder', () => {
-  it.todo('bloqueia pedido com líquido abaixo de R$ 300,00')
-  it.todo('bloqueia C002 (R$ 350 disponíveis) com pedido de R$ 400')
-  it.todo('bloqueia C010 (crédito totalmente utilizado)')
-})
