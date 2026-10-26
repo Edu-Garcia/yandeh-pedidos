@@ -33,12 +33,12 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | F1 — Regras puras (`shared`)      | 9       | 9      |
 | F2 — Banco e seed                 | 1       | 1      |
 | F3 — API (req. 1–5, 7)            | 8       | 8      |
-| F4 — Telas (req. 1–5, 7)          | 5       | 3      |
+| F4 — Telas (req. 1–5, 7)          | 5       | 4      |
 | F5 — Histórico e repetir (req. 8) | 2       | 0      |
 | F6 — Supervisor (fecha req. 5)    | 2       | 0      |
 | F7 — Offline parcial (req. 9)     | 2       | 0      |
 | F8 — Entrega e docs               | 4       | 0      |
-| **Total**                         | **34**  | **22** |
+| **Total**                         | **34**  | **23** |
 | Opcionais                         | 3       | 0      |
 
 > Sem estimativas de tempo: com IA acelerando a implementação, elas não refletem dados reais. Prioridade: núcleo (F1–F4 + F8, req. 1–7) primeiro. Se o prazo apertar, corte na ordem: opcionais → F7 → F6 (T-25) → F5, e registre em README "o que ficou de fora".
@@ -285,14 +285,16 @@ Validação comum: `pnpm --filter @yandeh/web typecheck && pnpm --filter @yandeh
 - **Commit:** `feat(web): busca de produtos no pedido`
 - **Status:** feito
 
-### [ ] T-20 — Pedido: carrinho (Unidades e Lote interligados, desconto, remover)
+### [x] T-20 — Pedido: carrinho (Unidades e Lote interligados, desconto, remover)
 
 - **Refs:** RN05, RN06; D9; R3.
 - **Depende de:** T-19, T-04
 - **Escopo:** store Pinia do rascunho em **unidades**; campos Unidades e Lote (rótulo CX/FD) interligados via funções de T-04; Unidades somente leitura quando `venda_somente_multiplo`; só Unidades para `UN` fator 1; desconto 0–100.
 - **Aceite:** P006 (FD 20, só múltiplo): Lote 2 FD → 40 un, Unidades somente leitura; P004 (CX 20, não só múltiplo): 7 un → Lote vazio, 20 un → Lote 1 CX, Lote 2 → 40 un; P010 (CX 12, só múltiplo): Lote 2 → 24 un, Unidades somente leitura; remover item atualiza totais; erro inline em quantidade inválida.
+- **Validação:** `pnpm --filter @yandeh/web typecheck && pnpm --filter @yandeh/web build`; `pnpm --filter @yandeh/web test` (store do rascunho, interligação P006/P004/P010, somente leitura, só Unidades para UN fator 1, faixa de desconto, remover e erro inline).
 - **Validação manual:** No pedido de C001: adicionar P006 Macarrão Espaguete 500g (FD 20, só múltiplo) → Lote 2 FD preenche 40 un e Unidades fica somente leitura. Adicionar P004 Óleo de Soja 900ml (CX 20, não só múltiplo): 7 un → Lote vazio; 20 un → Lote 1 CX; Lote 2 → 40 un. Adicionar P010 Leite UHT Integral 1L (CX 12, só múltiplo): Lote 2 → 24 un, Unidades somente leitura. Remover um item atualiza os totais; quantidade inválida mostra erro inline. Evidência: screenshots dos três produtos no carrinho.
 - **Commit:** `feat(web): carrinho com campos unidades e lote interligados`
+- **Status:** feito
 
 ### [ ] T-21 — Pedido: totais, bloqueios e envio
 

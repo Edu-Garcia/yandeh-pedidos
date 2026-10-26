@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api'
 import { PRODUCT_SEARCH_DEBOUNCE_MS } from '@/product-search'
 import { routes } from '@/router'
+import { DISCOUNT_ERROR, QUANTITY_ERROR } from '@/stores/order-draft'
 import { useSessionStore } from '@/stores/session'
 import OrderPage from './OrderPage.vue'
 
@@ -79,6 +80,58 @@ const p023: CustomerProduct = {
   unitPrice: 829,
 }
 
+const p001: CustomerProduct = {
+  id: 'P001',
+  sku: 'SKU-1000',
+  ean: '7891958224128',
+  description: 'Arroz Branco Tipo 1 5kg',
+  category: 'mercearia',
+  brand: 'Grão Fino',
+  saleUnit: 'UN',
+  packFactor: 1,
+  multipleOnly: false,
+  unitPrice: 2690,
+}
+
+const p004: CustomerProduct = {
+  id: 'P004',
+  sku: 'SKU-1003',
+  ean: '7891469138105',
+  description: 'Óleo de Soja 900ml',
+  category: 'mercearia',
+  brand: 'Soyara',
+  saleUnit: 'CX',
+  packFactor: 20,
+  multipleOnly: false,
+  unitPrice: 719,
+}
+
+const p006: CustomerProduct = {
+  id: 'P006',
+  sku: 'SKU-1005',
+  ean: '7891399588384',
+  description: 'Macarrão Espaguete 500g',
+  category: 'mercearia',
+  brand: 'Massa Boa',
+  saleUnit: 'FD',
+  packFactor: 20,
+  multipleOnly: true,
+  unitPrice: 333,
+}
+
+const p010: CustomerProduct = {
+  id: 'P010',
+  sku: 'SKU-1009',
+  ean: '7891216687320',
+  description: 'Leite UHT Integral 1L',
+  category: 'bebidas',
+  brand: 'Vale Verde',
+  saleUnit: 'CX',
+  packFactor: 12,
+  multipleOnly: true,
+  unitPrice: 499,
+}
+
 function normalizeBRL(value: string): string {
   return value.replace(/[\u00A0\u202F]/g, ' ')
 }
@@ -105,6 +158,37 @@ async function typeQuery(el: HTMLElement, value: string): Promise<void> {
   if (!input) throw new Error('Campo de busca não encontrado')
   input.value = value
   input.dispatchEvent(new Event('input', { bubbles: true }))
+  await nextTick()
+}
+
+async function searchFor(el: HTMLElement, value: string): Promise<void> {
+  vi.useFakeTimers()
+  await typeQuery(el, value)
+  await vi.advanceTimersByTimeAsync(PRODUCT_SEARCH_DEBOUNCE_MS)
+  vi.useRealTimers()
+}
+
+function cartLine(el: HTMLElement, productId: string): HTMLElement {
+  const row = el.querySelector(`[data-testid="cart-line"][data-product-id="${productId}"]`)
+  if (!row) throw new Error(`Linha ${productId} não encontrada no carrinho`)
+  return row as HTMLElement
+}
+
+function setField(root: HTMLElement, testId: string, value: string): void {
+  const input = root.querySelector(`[data-testid="${testId}"]`) as HTMLInputElement | null
+  if (!input) throw new Error(`Campo ${testId} não encontrado`)
+  input.value = value
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+}
+
+async function addFromSearch(el: HTMLElement, product: CustomerProduct): Promise<void> {
+  fetchCustomerProducts.mockResolvedValueOnce([product])
+  await searchFor(el, product.description)
+  await waitForText(el, product.description)
+  const row = el.querySelector(`[data-product-id="${product.id}"]`)
+  const add = row?.querySelector('[data-testid="add-product"]') as HTMLButtonElement | null
+  if (!add) throw new Error(`Botão adicionar de ${product.id} não encontrado`)
+  add.click()
   await nextTick()
 }
 
@@ -229,7 +313,8 @@ describe('OrderPage', () => {
     expect(el.textContent).not.toContain('P022')
     expect(normalizeBRL(p009Row?.textContent ?? '')).toContain(normalizeBRL(formatBRL(849)))
     expect(normalizeBRL(p023Row?.textContent ?? '')).toContain(normalizeBRL(formatBRL(829)))
-    expect(el.textContent).not.toContain('Adicionar')
+    expect(p009Row?.textContent).toContain('Adicionar')
+    expect(p023Row?.textContent).toContain('Adicionar')
   })
 
   it('mostra estado vazio quando a busca não encontra produto', async () => {
@@ -326,5 +411,146 @@ describe('OrderPage', () => {
     )
     retry?.click()
     await waitForText(el, 'Mercadinho São José')
+  })
+
+  it('adiciona da busca sem mostrar o id do produto', async () => {
+    fetchSellerCustomers.mockResolvedValue(v01Wallet)
+    const el = await render('C001')
+    await waitForText(el, 'Mercadinho São José')
+    await addFromSearch(el, p006)
+
+    const line = cartLine(el, 'P006')
+    expect(line.textContent).toContain('Macarrão Espaguete 500g')
+    expect(line.textContent).toContain('7891399588384')
+    expect(el.textContent).not.toContain('P006')
+    expect(el.querySelector('[data-testid="add-product"]')?.textContent).toContain('No carrinho')
+  })
+
+  it('P006: Lote 2 FD preenche 40 un e Unidades fica somente leitura', async () => {
+    fetchSellerCustomers.mockResolvedValue(v01Wallet)
+    const el = await render('C001')
+    await waitForText(el, 'Mercadinho São José')
+    await addFromSearch(el, p006)
+
+    const line = cartLine(el, 'P006')
+    const units = line.querySelector('[data-testid="cart-units"]') as HTMLInputElement
+    expect(units.readOnly).toBe(true)
+    expect(line.textContent).toContain('Lote FD')
+    expect(line.querySelector('[data-testid="cart-lots"]')).not.toBeNull()
+
+    setField(line, 'cart-lots', '2')
+    await nextTick()
+    expect((line.querySelector('[data-testid="cart-units"]') as HTMLInputElement).value).toBe('40')
+    expect((line.querySelector('[data-testid="cart-lots"]') as HTMLInputElement).value).toBe('2')
+    expect(units.readOnly).toBe(true)
+    expect(line.querySelector('[data-testid="cart-quantity-error"]')).toBeNull()
+    expect(normalizeBRL(line.textContent ?? '')).toContain(normalizeBRL(formatBRL(40 * 333)))
+  })
+
+  it('P004: 7 un → Lote vazio; 20 un → 1 CX; Lote 2 → 40 un', async () => {
+    fetchSellerCustomers.mockResolvedValue(v01Wallet)
+    const el = await render('C001')
+    await waitForText(el, 'Mercadinho São José')
+    await addFromSearch(el, p004)
+
+    const line = cartLine(el, 'P004')
+    const units = line.querySelector('[data-testid="cart-units"]') as HTMLInputElement
+    expect(units.readOnly).toBe(false)
+    expect(line.textContent).toContain('Lote CX')
+
+    setField(line, 'cart-units', '7')
+    await nextTick()
+    expect((line.querySelector('[data-testid="cart-lots"]') as HTMLInputElement).value).toBe('')
+
+    setField(line, 'cart-units', '20')
+    await nextTick()
+    expect((line.querySelector('[data-testid="cart-lots"]') as HTMLInputElement).value).toBe('1')
+
+    setField(line, 'cart-lots', '2')
+    await nextTick()
+    expect((line.querySelector('[data-testid="cart-units"]') as HTMLInputElement).value).toBe('40')
+    expect((line.querySelector('[data-testid="cart-lots"]') as HTMLInputElement).value).toBe('2')
+  })
+
+  it('P010: Lote 2 → 24 un e Unidades somente leitura', async () => {
+    fetchSellerCustomers.mockResolvedValue(v01Wallet)
+    const el = await render('C001')
+    await waitForText(el, 'Mercadinho São José')
+    await addFromSearch(el, p010)
+
+    const line = cartLine(el, 'P010')
+    expect((line.querySelector('[data-testid="cart-units"]') as HTMLInputElement).readOnly).toBe(
+      true,
+    )
+    expect(line.textContent).toContain('Lote CX')
+
+    setField(line, 'cart-lots', '2')
+    await nextTick()
+    expect((line.querySelector('[data-testid="cart-units"]') as HTMLInputElement).value).toBe('24')
+    expect((line.querySelector('[data-testid="cart-lots"]') as HTMLInputElement).value).toBe('2')
+  })
+
+  it('P001 (UN fator 1) mostra só Unidades', async () => {
+    fetchSellerCustomers.mockResolvedValue(v01Wallet)
+    const el = await render('C001')
+    await waitForText(el, 'Mercadinho São José')
+    await addFromSearch(el, p001)
+
+    const line = cartLine(el, 'P001')
+    expect(line.querySelector('[data-testid="cart-units"]')).not.toBeNull()
+    expect(line.querySelector('[data-testid="cart-lots"]')).toBeNull()
+    expect(line.textContent).not.toContain('Lote')
+    expect(el.textContent).not.toContain('P001')
+  })
+
+  it('mostra erro inline em quantidade e desconto inválidos', async () => {
+    fetchSellerCustomers.mockResolvedValue(v01Wallet)
+    const el = await render('C001')
+    await waitForText(el, 'Mercadinho São José')
+    await addFromSearch(el, p004)
+
+    const line = cartLine(el, 'P004')
+    setField(line, 'cart-units', '')
+    await nextTick()
+    expect(line.querySelector('[data-testid="cart-quantity-error"]')?.textContent).toBe(
+      QUANTITY_ERROR,
+    )
+
+    setField(line, 'cart-units', '7')
+    setField(line, 'cart-discount', '101')
+    await nextTick()
+    expect(line.querySelector('[data-testid="cart-discount-error"]')?.textContent).toBe(
+      DISCOUNT_ERROR,
+    )
+  })
+
+  it('remover item atualiza o subtotal', async () => {
+    fetchSellerCustomers.mockResolvedValue(v01Wallet)
+    const el = await render('C001')
+    await waitForText(el, 'Mercadinho São José')
+    await addFromSearch(el, p006)
+    await addFromSearch(el, p004)
+
+    const p006Line = cartLine(el, 'P006')
+    setField(p006Line, 'cart-lots', '2')
+    const p004Line = cartLine(el, 'P004')
+    setField(p004Line, 'cart-units', '7')
+    await nextTick()
+
+    const both = 40 * 333 + 7 * 719
+    expect(
+      normalizeBRL(el.querySelector('[data-testid="cart-subtotal"]')?.textContent ?? ''),
+    ).toContain(normalizeBRL(formatBRL(both)))
+
+    const remove = p004Line.querySelector('[data-testid="remove-line"]') as HTMLButtonElement | null
+    remove?.click()
+    await nextTick()
+
+    expect(el.querySelector('[data-product-id="P004"][data-testid="cart-line"]')).toBeNull()
+    expect(
+      normalizeBRL(el.querySelector('[data-testid="cart-subtotal"]')?.textContent ?? ''),
+    ).toContain(normalizeBRL(formatBRL(40 * 333)))
+    expect(el.textContent).not.toContain('Enviar')
+    expect(el.textContent).not.toContain('precisará de aprovação')
   })
 })
