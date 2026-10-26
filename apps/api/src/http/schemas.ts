@@ -53,6 +53,8 @@ export const productsCatalogSchema = z.array(productSchema)
 
 export const sellerIdHeaderSchema = z.string().trim().min(1)
 
+export const idempotencyKeyHeaderSchema = z.uuid()
+
 export const customerProductsQuerySchema = z.object({
   q: z.string().trim().min(1),
 })

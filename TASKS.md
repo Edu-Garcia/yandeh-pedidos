@@ -32,13 +32,13 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | F0 — Base (scaffold + docs)       | 1       | 1      |
 | F1 — Regras puras (`shared`)      | 9       | 9      |
 | F2 — Banco e seed                 | 1       | 1      |
-| F3 — API (req. 1–5, 7)            | 8       | 7      |
+| F3 — API (req. 1–5, 7)            | 8       | 8      |
 | F4 — Telas (req. 1–5, 7)          | 5       | 0      |
 | F5 — Histórico e repetir (req. 8) | 2       | 0      |
 | F6 — Supervisor (fecha req. 5)    | 2       | 0      |
 | F7 — Offline parcial (req. 9)     | 2       | 0      |
 | F8 — Entrega e docs               | 4       | 0      |
-| **Total**                         | **34**  | **18** |
+| **Total**                         | **34**  | **19** |
 | Opcionais                         | 3       | 0      |
 
 > Sem estimativas de tempo: com IA acelerando a implementação, elas não refletem dados reais. Prioridade: núcleo (F1–F4 + F8, req. 1–7) primeiro. Se o prazo apertar, corte na ordem: opcionais → F7 → F6 (T-25) → F5, e registre em README "o que ficou de fora".
@@ -242,7 +242,7 @@ Validação comum: `pnpm --filter @yandeh/api test` (Postgres de teste via `dock
 - **Docs:** A12 já decidida (histórico já está no `credito_utilizado`; só pedidos novos somam). Atualizar só se a implementação revelar algo novo.
 - **Commit:** `feat(api): reserva e consumo de crédito em transação`
 
-### [ ] T-16 — Idempotência do envio (`Idempotency-Key`)
+### [x] T-16 — Idempotência do envio (`Idempotency-Key`)
 
 - **Refs:** RN13; A20; R9.
 - **Depende de:** T-14
