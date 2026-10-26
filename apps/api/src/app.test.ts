@@ -110,6 +110,78 @@ describe('GET /sellers/:id/customers', () => {
   })
 })
 
+describe('GET /customers/:id/products', () => {
+  it('q=achocolatado em C001/V01 retorna P009 e P023 e omite inativos', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({
+      method: 'GET',
+      url: '/customers/C001/products?q=achocolatado',
+      headers: { 'x-seller-id': 'V01' },
+    })
+    expect(res.statusCode).toBe(200)
+    const body = res.json() as Array<{ id: string; description: string; ean: string }>
+    expect(body.map((item) => item.id)).toEqual(['P009', 'P023'])
+    expect(body.map((item) => item.description)).toEqual([
+      'Achocolatado em Pó 400g',
+      'Achocolatado em Pó 400g Sachê',
+    ])
+    expect(body.every((item) => item.ean === '7891831978575')).toBe(true)
+    expect(body.some((item) => item.id === 'P021' || item.id === 'P022')).toBe(false)
+    await app.close()
+  })
+
+  it('q=7891831978575 em C001/V01 retorna P009 e P023 (EAN duplicado)', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({
+      method: 'GET',
+      url: '/customers/C001/products?q=7891831978575',
+      headers: { 'x-seller-id': 'V01' },
+    })
+    expect(res.statusCode).toBe(200)
+    const body = res.json() as Array<{ id: string }>
+    expect(body.map((item) => item.id)).toEqual(['P009', 'P023'])
+    expect(body.some((item) => item.id === 'P021' || item.id === 'P022')).toBe(false)
+    await app.close()
+  })
+
+  it('C004 usa preços da TP01 (fallback): P001 = 2690', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({
+      method: 'GET',
+      url: '/customers/C004/products?q=arroz',
+      headers: { 'x-seller-id': 'V01' },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual([
+      {
+        id: 'P001',
+        sku: 'SKU-1000',
+        ean: '7891958224128',
+        description: 'Arroz Branco Tipo 1 5kg',
+        category: 'mercearia',
+        brand: 'Grão Fino',
+        saleUnit: 'UN',
+        packFactor: 1,
+        multipleOnly: false,
+        unitPrice: 2690,
+      },
+    ])
+    await app.close()
+  })
+
+  it('cliente de outra carteira retorna 403', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({
+      method: 'GET',
+      url: '/customers/C005/products?q=arroz',
+      headers: { 'x-seller-id': 'V01' },
+    })
+    expect(res.statusCode).toBe(403)
+    expect(res.json()).toEqual({ message: 'Cliente não pertence à carteira do vendedor' })
+    await app.close()
+  })
+})
+
 describe('POST /orders', () => {
   it.todo('com a mesma Idempotency-Key retorna o pedido já criado')
   it.todo('revalida as regras do @yandeh/shared e rejeita pedido abaixo do mínimo')

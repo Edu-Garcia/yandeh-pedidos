@@ -1,6 +1,7 @@
 import cors from '@fastify/cors'
 import Fastify from 'fastify'
 import type { Db } from './db/client.js'
+import { registerCustomerRoutes } from './routes/customers.js'
 import { registerIdentityRoutes } from './routes/identity.js'
 
 export function buildApp(database: Db) {
@@ -9,7 +10,8 @@ export function buildApp(database: Db) {
 
   app.get('/health', async () => ({ status: 'ok' }))
   registerIdentityRoutes(app, database)
+  registerCustomerRoutes(app, database)
 
-  // TODO (ver PRD.md §8): rotas de clientes, produtos, pedidos e aprovações.
+  // TODO (ver PRD.md §8): rotas de pedidos e aprovações.
   return app
 }
