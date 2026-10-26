@@ -1,4 +1,4 @@
-import type { Cents, Product } from './types'
+import type { Cents, Product } from './types.js'
 
 /**
  * Produto vendável (RN03 / A4 / A5).

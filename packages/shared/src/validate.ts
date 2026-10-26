@@ -1,8 +1,8 @@
-import { isValidQuantity } from './packaging'
-import { MINIMUM_ORDER_CENTS } from './rules'
-import { isSellable } from './sellable'
-import { orderTotals } from './totals'
-import type { Cents, OrderLineInput, Product, ValidationIssue } from './types'
+import { isValidQuantity } from './packaging.js'
+import { MINIMUM_ORDER_CENTS } from './rules.js'
+import { isSellable } from './sellable.js'
+import { orderTotals } from './totals.js'
+import type { Cents, OrderLineInput, Product, ValidationIssue } from './types.js'
 
 /** Mensagens pt-BR dos bloqueios (PRD §8, coluna "Quando"). */
 const ISSUE_MESSAGES = {

@@ -1,4 +1,4 @@
-import type { Cents, OrderLineInput, OrderLineTotals, OrderTotals } from './types'
+import type { Cents, OrderLineInput, OrderLineTotals, OrderTotals } from './types.js'
 
 /**
  * RN07 / D8: desconto_linha = round(bruto × d / 100), half-up por linha.

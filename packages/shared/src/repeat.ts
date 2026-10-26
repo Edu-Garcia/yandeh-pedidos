@@ -1,7 +1,7 @@
-import { lotsFromUnits, unitsFromLots } from './packaging'
-import { unitPriceFor } from './price'
-import { isSellable } from './sellable'
-import type { Cents, OrderLineInput, PriceItem, Product } from './types'
+import { lotsFromUnits, unitsFromLots } from './packaging.js'
+import { unitPriceFor } from './price.js'
+import { isSellable } from './sellable.js'
+import type { Cents, OrderLineInput, PriceItem, Product } from './types.js'
 
 /** Item do histórico: o banco guarda só unidades (A26 / D13). */
 export interface HistoryOrderItem {

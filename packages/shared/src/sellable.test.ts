@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { toCents } from './money'
-import { unitPriceFor } from './price'
-import { isSellable } from './sellable'
-import type { PriceItem, Product } from './types'
+import { toCents } from './money.js'
+import { unitPriceFor } from './price.js'
+import { isSellable } from './sellable.js'
+import type { PriceItem, Product } from './types.js'
 
 /** P001 Arroz Branco Tipo 1 5kg — ativo no seed. */
 const productP001: Product = {

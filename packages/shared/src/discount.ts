@@ -1,4 +1,4 @@
-import type { OrderLineInput, OrderStatus } from './types'
+import type { OrderLineInput, OrderStatus } from './types.js'
 
 /**
  * Maior desconto percentual entre as linhas (RN10 / D7 / A9).

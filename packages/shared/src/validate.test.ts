@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { toCents } from './money'
-import { unitPriceFor } from './price'
-import { MINIMUM_ORDER_CENTS } from './rules'
-import { isSellable } from './sellable'
-import type { PriceItem, Product, ValidationIssue } from './types'
-import { validateOrder, type ValidateOrderLine } from './validate'
+import { toCents } from './money.js'
+import { unitPriceFor } from './price.js'
+import { MINIMUM_ORDER_CENTS } from './rules.js'
+import { isSellable } from './sellable.js'
+import type { PriceItem, Product, ValidationIssue } from './types.js'
+import { validateOrder, type ValidateOrderLine } from './validate.js'
 
 /** P001 Arroz Branco Tipo 1 5kg — UN fator 1, ativo (seed). */
 const productP001: Product = {

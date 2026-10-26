@@ -32,13 +32,13 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | F0 — Base (scaffold + docs)       | 1       | 1      |
 | F1 — Regras puras (`shared`)      | 9       | 9      |
 | F2 — Banco e seed                 | 1       | 1      |
-| F3 — API (req. 1–5, 7)            | 6       | 1      |
+| F3 — API (req. 1–5, 7)            | 7       | 2      |
 | F4 — Telas (req. 1–5, 7)          | 5       | 0      |
 | F5 — Histórico e repetir (req. 8) | 2       | 0      |
 | F6 — Supervisor (fecha req. 5)    | 2       | 0      |
 | F7 — Offline parcial (req. 9)     | 2       | 0      |
 | F8 — Entrega e docs               | 4       | 0      |
-| **Total**                         | **32**  | **12** |
+| **Total**                         | **33**  | **13** |
 | Opcionais                         | 3       | 0      |
 
 > Sem estimativas de tempo: com IA acelerando a implementação, elas não refletem dados reais. Prioridade: núcleo (F1–F4 + F8, req. 1–7) primeiro. Se o prazo apertar, corte na ordem: opcionais → F7 → F6 (T-25) → F5, e registre em README "o que ficou de fora".
@@ -179,6 +179,17 @@ Validação comum: `pnpm --filter @yandeh/api test` (Postgres de teste via `dock
 - **Validação:** `curl localhost:3333/sellers`.
 - **Validação manual:** `docker compose up --build`. `curl -sS -D- localhost:3333/sellers` → 200 com V01 Carlos Menezes (alçada 5), V02 Renata Lima (7), V03 Paulo Andrade (3). `curl -sS -D- localhost:3333/supervisors` → 200 com S01 Marta Fernandes. Evidência: status + JSON.
 - **Commit:** `feat(api): lista vendedores e supervisor para login simulado`
+
+### [x] T-11b — Imports ESM do @yandeh/shared (tarefa extra)
+
+- **Refs:** T-11 (schemas Zod espelhavam `Seller`/`Supervisor`); API NodeNext/ESM; preparação para T-12+ (`validateOrder`, `orderTotals`).
+- **Depende de:** T-11
+- **Escopo:** `packages/shared` compila com `module`/`moduleResolution` `NodeNext` e imports/exports relativos com extensão `.js` (src e testes). API importa tipos de `@yandeh/shared` (sem mudar o JSON das rotas). Teste de fumaça na API que importa uma função do shared em runtime. Sem bundler e sem apontar `exports` para o src.
+- **Fora:** regras de rotas futuras; DECISIONS.md; seed.json.
+- **Aceite:** `dist/index.js` emite `export * from './types.js'`; typecheck NodeNext da API enxerga `Seller`/`Supervisor` do shared; teste da API resolve `lineTotals` em runtime; `GET /sellers` e `/supervisors` 200 com o mesmo JSON; `pnpm --filter @yandeh/web build` OK; `docker compose up --build` sobe.
+- **Validação:** `pnpm install && pnpm typecheck && pnpm lint && pnpm format:check && pnpm test`; `pnpm --filter @yandeh/shared build` e `head packages/shared/dist/index.js`.
+- **Validação manual:** de `apps/api`, `node --input-type=module -e "import { lineTotals } from '@yandeh/shared'; ..."`; `docker compose up --build` + `curl` `/sellers` e `/supervisors`; `pnpm --filter @yandeh/web build`.
+- **Commit:** `fix(shared): emite imports ESM com extensão .js`
 
 ### [ ] T-12 — `GET /sellers/:id/customers` (carteira com crédito e tabela efetiva)
 

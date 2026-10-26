@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import seed from '../../../apps/api/seed/seed.json'
-import { toCents } from './money'
-import { lotsFromUnits } from './packaging'
-import { buildRepeatDraft, type HistoryOrder } from './repeat'
-import type { PriceItem, Product } from './types'
+import seed from '../../../apps/api/seed/seed.json' with { type: 'json' }
+import { toCents } from './money.js'
+import { lotsFromUnits } from './packaging.js'
+import { buildRepeatDraft, type HistoryOrder } from './repeat.js'
+import type { PriceItem, Product } from './types.js'
 
 /** P001 Arroz Branco Tipo 1 5kg — UN fator 1, ativo (seed). */
 const productP001: Product = {
