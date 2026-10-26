@@ -27,19 +27,19 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 
 ## Progresso
 
-| Fase                              | Tarefas | `[x]` |
-| --------------------------------- | ------- | ----- |
-| F0 — Base (scaffold + docs)       | 1       | 1     |
-| F1 — Regras puras (`shared`)      | 9       | 8     |
-| F2 — Banco e seed                 | 1       | 0     |
-| F3 — API (req. 1–5, 7)            | 6       | 0     |
-| F4 — Telas (req. 1–5, 7)          | 5       | 0     |
-| F5 — Histórico e repetir (req. 8) | 2       | 0     |
-| F6 — Supervisor (fecha req. 5)    | 2       | 0     |
-| F7 — Offline parcial (req. 9)     | 2       | 0     |
-| F8 — Entrega e docs               | 4       | 0     |
-| **Total**                         | **32**  | **9** |
-| Opcionais                         | 3       | 0     |
+| Fase                              | Tarefas | `[x]`  |
+| --------------------------------- | ------- | ------ |
+| F0 — Base (scaffold + docs)       | 1       | 1      |
+| F1 — Regras puras (`shared`)      | 9       | 9      |
+| F2 — Banco e seed                 | 1       | 0      |
+| F3 — API (req. 1–5, 7)            | 6       | 0      |
+| F4 — Telas (req. 1–5, 7)          | 5       | 0      |
+| F5 — Histórico e repetir (req. 8) | 2       | 0      |
+| F6 — Supervisor (fecha req. 5)    | 2       | 0      |
+| F7 — Offline parcial (req. 9)     | 2       | 0      |
+| F8 — Entrega e docs               | 4       | 0      |
+| **Total**                         | **32**  | **10** |
+| Opcionais                         | 3       | 0      |
 
 > Sem estimativas de tempo: com IA acelerando a implementação, elas não refletem dados reais. Prioridade: núcleo (F1–F4 + F8, req. 1–7) primeiro. Se o prazo apertar, corte na ordem: opcionais → F7 → F6 (T-25) → F5, e registre em README "o que ficou de fora".
 
@@ -145,7 +145,7 @@ Consumir `@yandeh/shared` hoje exige `pnpm --filter @yandeh/shared build` antes:
 - **Docs:** códigos já definidos em PRD §8 e A24; atualizar se surgir código novo.
 - **Commit:** `feat(shared): validação agregada de bloqueios de envio`
 
-### [ ] T-09 — Montagem de "repetir pedido"
+### [x] T-09 — Montagem de "repetir pedido"
 
 - **Refs:** RN12; D12; A15–A18; R8.
 - **Depende de:** T-03, T-04
