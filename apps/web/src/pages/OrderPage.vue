@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { formatBRL, type CustomerProduct, type SellerCustomer } from '@yandeh/shared'
-import { onUnmounted, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { fetchCustomerProducts, fetchSellerCustomers, isHiddenResourceError } from '@/api'
+import CartLine from '@/components/CartLine.vue'
 import SessionBar from '@/components/SessionBar.vue'
 import { PRODUCT_SEARCH_DEBOUNCE_MS } from '@/product-search'
+import { useOrderDraftStore } from '@/stores/order-draft'
 import { useSessionStore } from '@/stores/session'
 import NotFoundPage from './NotFoundPage.vue'
 
 const props = defineProps<{ clientId: string }>()
 const session = useSessionStore()
+const draft = useOrderDraftStore()
 
 const customer = ref<SellerCustomer | null>(null)
 const customerLoading = ref(true)
@@ -21,6 +24,9 @@ const searching = ref(false)
 const searchError = ref<string | null>(null)
 const hasSearched = ref(false)
 const lastQuery = ref('')
+
+const cartLines = computed(() => draft.linesOf(props.clientId))
+const cartTotals = computed(() => draft.draftTotals(props.clientId))
 
 let debounceHandle: ReturnType<typeof setTimeout> | undefined
 let searchSeq = 0
@@ -100,6 +106,10 @@ function scheduleSearch(value: string): void {
   debounceHandle = setTimeout(() => {
     void runSearch(value)
   }, PRODUCT_SEARCH_DEBOUNCE_MS)
+}
+
+function addProduct(product: CustomerProduct): void {
+  draft.addProduct(props.clientId, product)
 }
 
 watch(
@@ -219,25 +229,63 @@ onUnmounted(() => {
             v-for="product in products"
             :key="product.id"
             :data-product-id="product.id"
-            class="flex min-h-20 items-start justify-between gap-3 py-4"
+            class="py-4"
           >
-            <span class="min-w-0">
-              <span class="block font-display text-xl leading-tight text-counter">
-                {{ product.description }}
+            <div class="flex items-start justify-between gap-3">
+              <span class="min-w-0">
+                <span class="block font-display text-xl leading-tight text-counter">
+                  {{ product.description }}
+                </span>
+                <span class="mt-1 block font-sans text-sm text-steel">
+                  {{ product.ean }}
+                </span>
               </span>
-              <span class="mt-1 block font-sans text-sm text-steel">
-                {{ product.ean }}
+              <span class="shrink-0 text-right font-display text-xl leading-tight text-counter">
+                {{ formatBRL(product.unitPrice) }}
               </span>
-            </span>
-            <span class="shrink-0 text-right font-display text-xl leading-tight text-counter">
-              {{ formatBRL(product.unitPrice) }}
-            </span>
+            </div>
+            <button
+              type="button"
+              data-testid="add-product"
+              :disabled="draft.hasProduct(customer.id, product.id)"
+              class="mt-3 min-h-12 border-b-2 px-1 font-sans text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-safety disabled:border-steel disabled:text-steel"
+              :class="
+                draft.hasProduct(customer.id, product.id)
+                  ? 'border-steel text-steel'
+                  : 'border-produce text-produce'
+              "
+              @click="addProduct(product)"
+            >
+              {{ draft.hasProduct(customer.id, product.id) ? 'No carrinho' : 'Adicionar' }}
+            </button>
           </li>
         </ul>
 
         <p v-else class="mt-8 font-sans text-base text-steel">
           Digite o nome ou o EAN para ver o preço da tabela.
         </p>
+
+        <section data-testid="cart" class="mt-10">
+          <h2 class="font-display text-2xl text-counter">Itens do pedido</h2>
+          <p
+            v-if="cartLines.length === 0"
+            data-testid="cart-empty"
+            class="mt-4 font-sans text-base text-steel"
+          >
+            Nenhum item no pedido.
+          </p>
+          <ul v-else class="mt-4 space-y-3">
+            <CartLine
+              v-for="line in cartLines"
+              :key="line.product.id"
+              :customer-id="customer.id"
+              :line="line"
+            />
+          </ul>
+          <p data-testid="cart-subtotal" class="mt-6 font-display text-2xl text-counter">
+            Subtotal {{ formatBRL(cartTotals.net) }}
+          </p>
+        </section>
       </template>
     </section>
   </div>
