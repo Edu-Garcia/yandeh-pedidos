@@ -141,3 +141,69 @@ export const createdOrderSchema = z.object({
   }),
   items: z.array(createdOrderItemSchema),
 })
+
+/** Status persistidos: novos (T-14) + histórico do seed (Faturado/Cancelado). */
+export const customerOrderStatusSchema = z.enum([
+  'Enviado',
+  'Aguardando aprovação',
+  'Aprovado',
+  'Rejeitado',
+  'Faturado',
+  'Cancelado',
+])
+
+export const customerOrderSummarySchema = z.object({
+  id: z.string(),
+  date: z.string(),
+  status: customerOrderStatusSchema,
+  /** Líquido em centavos, com preço e desconto congelados do pedido. */
+  total: z.number(),
+})
+
+export const customerOrdersResponseSchema = z.array(customerOrderSummarySchema)
+
+/**
+ * Linha do repeat: `product` é o mesmo contrato da busca (T-13 / `CustomerProduct`)
+ * para a T-23 reaproveitar o tipo do carrinho. `productId` é só chave interna.
+ */
+export const repeatDraftLineSchema = z.object({
+  productId: z.string(),
+  product: customerProductSchema,
+  quantityUnits: z.number(),
+  discountPercent: z.number(),
+  lots: z.number().nullable(),
+})
+
+export const repeatRemovedItemSchema = z.object({
+  productId: z.string(),
+  description: z.string().nullable(),
+  ean: z.string().nullable(),
+  reason: z.string(),
+})
+
+export const repeatNoticeSchema = z.discriminatedUnion('code', [
+  z.object({
+    code: z.literal('PACK_FACTOR_CHANGED'),
+    productId: z.string(),
+    description: z.string().nullable(),
+    newFactor: z.number(),
+    lots: z.number(),
+    units: z.number(),
+    message: z.string(),
+  }),
+  z.object({
+    code: z.literal('LOT_NOT_EXACT'),
+    productId: z.string(),
+    description: z.string().nullable(),
+    newFactor: z.number(),
+    lots: z.null(),
+    units: z.number(),
+    message: z.string(),
+  }),
+])
+
+export const repeatDraftResponseSchema = z.object({
+  lines: z.array(repeatDraftLineSchema),
+  removed: z.array(repeatRemovedItemSchema),
+  notices: z.array(repeatNoticeSchema),
+})

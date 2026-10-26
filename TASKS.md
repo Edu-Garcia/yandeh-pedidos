@@ -34,11 +34,11 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | F2 — Banco e seed                 | 1       | 1      |
 | F3 — API (req. 1–5, 7)            | 8       | 8      |
 | F4 — Telas (req. 1–5, 7)          | 5       | 5      |
-| F5 — Histórico e repetir (req. 8) | 2       | 0      |
+| F5 — Histórico e repetir (req. 8) | 2       | 1      |
 | F6 — Supervisor (fecha req. 5)    | 2       | 0      |
 | F7 — Offline parcial (req. 9)     | 2       | 0      |
 | F8 — Entrega e docs               | 4       | 0      |
-| **Total**                         | **34**  | **24** |
+| **Total**                         | **34**  | **25** |
 | Opcionais                         | 3       | 0      |
 
 > Sem estimativas de tempo: com IA acelerando a implementação, elas não refletem dados reais. Prioridade: núcleo (F1–F4 + F8, req. 1–7) primeiro. Se o prazo apertar, corte na ordem: opcionais → F7 → F6 (T-25) → F5, e registre em README "o que ficou de fora".
@@ -308,14 +308,15 @@ Validação comum: `pnpm --filter @yandeh/web typecheck && pnpm --filter @yandeh
 
 ## F5 — Histórico e repetir (req. 8)
 
-### [ ] T-22 — API: `GET /customers/:id/orders` e `POST .../repeat`
+### [x] T-22 — API: `GET /customers/:id/orders` e `POST .../repeat`
 
-- **Refs:** RN12; A15–A18; R8.
+- **Refs:** RN12; A15–A18, A33–A36; R8.
 - **Depende de:** T-14, T-09
 - **Aceite:** C001 lista PH001 com status/total; repeat PH001 → itens sem P022 + `removed` com motivo, P001 a 2690, descontos 0; **não** cria pedido (`count(pedidos)` igual); PH004 Cancelado listado e repetível; outra carteira → 403.
 - **Validação:** `curl -X POST -H 'X-Seller-Id: V01' localhost:3333/customers/C001/orders/PH001/repeat`.
 - **Validação manual:** `docker compose up`. `curl -sS -D- -H 'X-Seller-Id: V01' localhost:3333/customers/C001/orders` → 200 listando PH001 com status/total. `curl -sS -D- -X POST -H 'X-Seller-Id: V01' localhost:3333/customers/C001/orders/PH001/repeat` → 200 com itens sem P022, `removed` com motivo, P001 a 2690, descontos 0; `SELECT count(*) FROM pedidos` inalterado. Repeat de PH004 (Cancelado, C006, `X-Seller-Id: V02`) funciona. `curl -sS -D- -H 'X-Seller-Id: V01' localhost:3333/customers/C005/orders` → 403. Evidência: status + JSON + count.
 - **Commit:** `feat(api): histórico do cliente e montagem de repetir pedido`
+- **Status:** feito
 
 ### [ ] T-23 — Web: histórico e "Repetir pedido"
 
