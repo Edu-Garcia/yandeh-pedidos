@@ -63,6 +63,20 @@ export interface SellerCustomer {
   availableCredit: Cents
 }
 
+/** Produto vendável da busca do cliente (RN03, RN04): preço da tabela efetiva. */
+export interface CustomerProduct {
+  id: string
+  sku: string
+  ean: string
+  description: string
+  category: string
+  brand: string
+  saleUnit: SaleUnit
+  packFactor: number
+  multipleOnly: boolean
+  unitPrice: Cents
+}
+
 export interface OrderLineInput {
   productId: string
   /** Quantidade SEMPRE em unidades. */
