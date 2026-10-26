@@ -1,4 +1,4 @@
-import type { Seller, SellerCustomer, Supervisor } from '@yandeh/shared'
+import type { CustomerProduct, Seller, SellerCustomer, Supervisor } from '@yandeh/shared'
 import { useSessionStore } from '@/stores/session'
 
 export const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3333'
@@ -38,4 +38,18 @@ export function fetchSupervisors(): Promise<Supervisor[]> {
 
 export function fetchSellerCustomers(sellerId: string): Promise<SellerCustomer[]> {
   return apiRequest<SellerCustomer[]>(`/sellers/${sellerId}/customers`)
+}
+
+export function fetchCustomerProducts(
+  customerId: string,
+  query: string,
+  init: RequestInit = {},
+): Promise<CustomerProduct[]> {
+  const params = new URLSearchParams({ q: query })
+  return apiRequest<CustomerProduct[]>(`/customers/${customerId}/products?${params}`, init)
+}
+
+/** 403/404 da API: não revelar se o recurso existe (T-17). */
+export function isHiddenResourceError(error: unknown): boolean {
+  return error instanceof ApiError && (error.status === 403 || error.status === 404)
 }
