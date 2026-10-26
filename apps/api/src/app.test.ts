@@ -1,11 +1,19 @@
 import { randomUUID } from 'node:crypto'
-import { inArray, notInArray } from 'drizzle-orm'
+import { businessDate } from '@yandeh/shared'
+import { eq, inArray, notInArray } from 'drizzle-orm'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { buildApp } from './app.js'
 import { db, pool } from './db/client.js'
 import { pedidos, pedidosItens } from './db/schema.js'
 
 const SEED_ORDER_IDS = ['PH001', 'PH002', 'PH003', 'PH004']
+
+function civilDate(value: string | Date | null | undefined): string {
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10)
+  }
+  return String(value).slice(0, 10)
+}
 
 const exampleC001Items = [
   { productId: 'P001', quantity: 10, discountPercent: 0 },
@@ -314,6 +322,32 @@ describe('POST /orders', () => {
       minimum: 30000,
       net: 2690,
     })
+    await app.close()
+  })
+
+  it('grava a data civil no fuso do negócio, não em UTC', async () => {
+    const frozen = new Date('2026-10-27T02:30:00.000Z')
+    const app = buildApp(db, { now: () => frozen })
+    const res = await app.inject({
+      method: 'POST',
+      url: '/orders',
+      headers: {
+        'x-seller-id': 'V01',
+        'content-type': 'application/json',
+        'idempotency-key': randomUUID(),
+      },
+      payload: { customerId: 'C001', items: exampleC001Items },
+    })
+
+    expect(res.statusCode).toBe(201)
+    const body = res.json() as { id: string }
+    const [order] = await db
+      .select({ data: pedidos.data })
+      .from(pedidos)
+      .where(eq(pedidos.id, body.id))
+    expect(frozen.toISOString().slice(0, 10)).toBe('2026-10-27')
+    expect(civilDate(order?.data)).toBe('2026-10-26')
+    expect(civilDate(order?.data)).toBe(businessDate(frozen, 'America/Fortaleza'))
     await app.close()
   })
 

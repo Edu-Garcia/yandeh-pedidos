@@ -32,13 +32,13 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | F0 — Base (scaffold + docs)       | 1       | 1      |
 | F1 — Regras puras (`shared`)      | 9       | 9      |
 | F2 — Banco e seed                 | 1       | 1      |
-| F3 — API (req. 1–5, 7)            | 7       | 5      |
+| F3 — API (req. 1–5, 7)            | 8       | 6      |
 | F4 — Telas (req. 1–5, 7)          | 5       | 0      |
 | F5 — Histórico e repetir (req. 8) | 2       | 0      |
 | F6 — Supervisor (fecha req. 5)    | 2       | 0      |
 | F7 — Offline parcial (req. 9)     | 2       | 0      |
 | F8 — Entrega e docs               | 4       | 0      |
-| **Total**                         | **33**  | **16** |
+| **Total**                         | **34**  | **17** |
 | Opcionais                         | 3       | 0      |
 
 > Sem estimativas de tempo: com IA acelerando a implementação, elas não refletem dados reais. Prioridade: núcleo (F1–F4 + F8, req. 1–7) primeiro. Se o prazo apertar, corte na ordem: opcionais → F7 → F6 (T-25) → F5, e registre em README "o que ficou de fora".
@@ -220,6 +220,17 @@ Validação comum: `pnpm --filter @yandeh/api test` (Postgres de teste via `dock
 - **Validação:** `curl -X POST -H 'Content-Type: application/json' -H 'X-Seller-Id: V01' -H "Idempotency-Key: $(uuidgen)" -d '{"customerId":"C001","items":[{"productId":"P001","quantity":10,"discountPercent":0},{"productId":"P006","quantity":40,"discountPercent":2},{"productId":"P010","quantity":24,"discountPercent":0}]}' localhost:3333/orders`.
 - **Validação manual:** `docker compose up`. `curl -sS -D- -X POST -H 'Content-Type: application/json' -H 'X-Seller-Id: V01' -H "Idempotency-Key: $(uuidgen)" -d '{"customerId":"C001","items":[{"productId":"P001","quantity":10,"discountPercent":0},{"productId":"P006","quantity":40,"discountPercent":2},{"productId":"P010","quantity":24,"discountPercent":0}]}' localhost:3333/orders` → 201, `status: "Enviado"`, total líquido 51930. O mesmo body com P001 `discountPercent: 6` → 201, `status: "Aguardando aprovação"`. Pedido com líquido < 30000 (ex.: só P001 `quantity: 1`) → 422 com `code: "BELOW_MINIMUM"` (PRD §8). `customerId: "C005"` com `X-Seller-Id: V01` → 403. Evidência: status + JSON.
 - **Commit:** `feat(api): cria pedido validando regras e decidindo status`
+
+### [x] T-14b — Data do pedido no fuso do negócio (tarefa extra)
+
+- **Refs:** T-14 (`POST /orders` gravava `data` via `toISOString()` em UTC); clientes do seed em CE (`America/Fortaleza`).
+- **Depende de:** T-14
+- **Escopo:** `businessDate(now, timeZone)` em `@yandeh/shared` (`Intl.DateTimeFormat('en-CA')`, relógio injetável). API lê `BUSINESS_TIMEZONE` (default `America/Fortaleza`) e grava a data civil desse fuso. Testes da virada (23:30Z / 02:30Z / 03:00Z) e teste de API com relógio congelado. Documentar a env em `.env.example` e compose.
+- **Fora:** crédito (T-15), idempotência (T-16); DECISIONS.md; seed.json; guards contra fuso inválido.
+- **Aceite:** `2026-10-26T23:30:00Z` → `2026-10-26`; `2026-10-27T02:30:00Z` → `2026-10-26`; `2026-10-27T03:00:00Z` → `2026-10-27` em Fortaleza. POST `/orders` com relógio em `2026-10-27T02:30:00Z` grava `data = 2026-10-26`.
+- **Validação:** `pnpm install && pnpm typecheck && pnpm lint && pnpm format:check && pnpm test` (inclui `pnpm --filter @yandeh/api test`).
+- **Validação manual:** `docker compose up --build`. POST do exemplo C001 (`X-Seller-Id: V01`, itens P001 qty 10 desc 0, P006 qty 40 desc 2, P010 qty 24 desc 0). No psql do container: coluna `data` do pedido criado junto com `now()` em UTC e `now() at time zone 'America/Fortaleza'`, provando que a data gravada é a de Fortaleza. Saída dos testes unitários da virada.
+- **Commit:** `fix(api): grava data do pedido no fuso do negócio`
 
 ### [ ] T-15 — Crédito em transação (`SELECT ... FOR UPDATE`)
 

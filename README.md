@@ -42,6 +42,8 @@ pnpm --filter @yandeh/shared build
 pnpm dev                              # api (3333) + web (5173)
 ```
 
+Variáveis da API (ver `.env.example` e `docker-compose.yml`): `DATABASE_URL`, `API_PORT`, `HOST`, `BUSINESS_TIMEZONE` (fuso da data civil do pedido; default `America/Fortaleza`).
+
 ## Como testar
 
 ```bash

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import {
+  businessDate,
   orderTotals,
   resolvePriceTableId,
   statusForDiscount,
@@ -13,6 +14,7 @@ import type { FastifyInstance } from 'fastify'
 import type { Db } from '../db/client.js'
 import { availableCreditForCustomer } from '../db/pending-credit.js'
 import { pedidos, pedidosItens, produtos, tabelasPrecoItens, vendedores } from '../db/schema.js'
+import { env } from '../env.js'
 import { findCustomerInSellerWallet } from '../http/seller-access.js'
 import {
   createOrderBodySchema,
@@ -22,7 +24,11 @@ import {
   validationIssuesSchema,
 } from '../http/schemas.js'
 
-export function registerOrderRoutes(app: FastifyInstance, database: Db) {
+export type OrderRouteDeps = {
+  now?: () => Date
+}
+
+export function registerOrderRoutes(app: FastifyInstance, database: Db, deps: OrderRouteDeps = {}) {
   app.post('/orders', async (request, reply) => {
     const sellerId = sellerIdHeaderSchema.safeParse(request.headers['x-seller-id'])
     if (!sellerId.success) {
@@ -103,7 +109,8 @@ export function registerOrderRoutes(app: FastifyInstance, database: Db) {
     const totals = orderTotals(pricedLines)
     const status = statusForDiscount(pricedLines, sellerRows[0]!.discountAuthorityPercent)
     const orderId = randomUUID()
-    const orderDate = new Date().toISOString().slice(0, 10)
+    const now = deps.now ?? (() => new Date())
+    const orderDate = businessDate(now(), env.BUSINESS_TIMEZONE)
 
     await database.transaction(async (tx) => {
       await tx.insert(pedidos).values({
