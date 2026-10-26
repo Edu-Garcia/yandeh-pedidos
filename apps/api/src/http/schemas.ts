@@ -1,4 +1,11 @@
-import type { CustomerProduct, Product, Seller, SellerCustomer, Supervisor } from '@yandeh/shared'
+import type {
+  CustomerProduct,
+  Product,
+  Seller,
+  SellerCustomer,
+  Supervisor,
+  ValidationIssue,
+} from '@yandeh/shared'
 import { z } from 'zod'
 
 export const sellerSchema = z.object({
@@ -64,3 +71,70 @@ export const customerProductSchema = z.object({
 }) satisfies z.ZodType<CustomerProduct>
 
 export const customerProductsResponseSchema = z.array(customerProductSchema)
+
+export const createOrderItemSchema = z.object({
+  productId: z.string().trim().min(1),
+  quantity: z.number(),
+  discountPercent: z.number(),
+})
+
+export const createOrderBodySchema = z.object({
+  customerId: z.string().trim().min(1),
+  items: z.array(createOrderItemSchema),
+})
+
+export const validationIssueSchema = z.discriminatedUnion('code', [
+  z.object({
+    code: z.literal('EMPTY_ORDER'),
+    message: z.string(),
+  }),
+  z.object({
+    code: z.literal('INVALID_QUANTITY'),
+    message: z.string(),
+    productId: z.string(),
+  }),
+  z.object({
+    code: z.literal('INVALID_DISCOUNT'),
+    message: z.string(),
+    productId: z.string(),
+  }),
+  z.object({
+    code: z.literal('PRODUCT_NOT_SELLABLE'),
+    message: z.string(),
+    productId: z.string(),
+  }),
+  z.object({
+    code: z.literal('BELOW_MINIMUM'),
+    message: z.string(),
+    minimum: z.number(),
+    net: z.number(),
+  }),
+  z.object({
+    code: z.literal('INSUFFICIENT_CREDIT'),
+    message: z.string(),
+    available: z.number(),
+    net: z.number(),
+  }),
+]) satisfies z.ZodType<ValidationIssue>
+
+export const validationIssuesSchema = z.array(validationIssueSchema)
+
+export const createdOrderItemSchema = z.object({
+  productId: z.string(),
+  quantity: z.number(),
+  unitPrice: z.number(),
+  discountPercent: z.number(),
+})
+
+export const createdOrderSchema = z.object({
+  id: z.string(),
+  customerId: z.string(),
+  sellerId: z.string(),
+  status: z.enum(['Enviado', 'Aguardando aprovação']),
+  totals: z.object({
+    gross: z.number(),
+    discount: z.number(),
+    net: z.number(),
+  }),
+  items: z.array(createdOrderItemSchema),
+})

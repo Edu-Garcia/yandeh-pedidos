@@ -1,8 +1,9 @@
-import { availableCredit, orderTotals, reservedCredit, resolvePriceTableId } from '@yandeh/shared'
-import { asc, eq, inArray } from 'drizzle-orm'
+import { availableCredit, reservedCredit, resolvePriceTableId } from '@yandeh/shared'
+import { asc, eq } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import type { Db } from '../db/client.js'
-import { clientes, pedidos, pedidosItens, supervisores, vendedores } from '../db/schema.js'
+import { pendingNetsByCustomer } from '../db/pending-credit.js'
+import { clientes, supervisores, vendedores } from '../db/schema.js'
 import {
   sellerCustomersResponseSchema,
   sellersResponseSchema,
@@ -87,67 +88,4 @@ export function registerIdentityRoutes(app: FastifyInstance, database: Db) {
 
     return sellerCustomersResponseSchema.parse(payload)
   })
-}
-
-async function pendingNetsByCustomer(database: Db, customerIds: string[]) {
-  const byCustomer = new Map<string, Array<{ status: string; net: number }>>()
-  if (customerIds.length === 0) {
-    return byCustomer
-  }
-
-  const rows = await database
-    .select({
-      orderId: pedidos.id,
-      customerId: pedidos.clienteId,
-      status: pedidos.status,
-      productId: pedidosItens.produtoId,
-      quantityUnits: pedidosItens.quantidade,
-      unitPrice: pedidosItens.precoUnidadeCentavos,
-      discountPercent: pedidosItens.descontoPercentual,
-    })
-    .from(pedidos)
-    .innerJoin(pedidosItens, eq(pedidosItens.pedidoId, pedidos.id))
-    .where(inArray(pedidos.clienteId, customerIds))
-    .orderBy(asc(pedidos.id), asc(pedidosItens.produtoId))
-
-  const linesByOrder = new Map<
-    string,
-    {
-      customerId: string
-      status: string
-      lines: Array<{
-        productId: string
-        quantityUnits: number
-        unitPrice: number
-        discountPercent: number
-      }>
-    }
-  >()
-
-  for (const row of rows) {
-    const line = {
-      productId: row.productId,
-      quantityUnits: row.quantityUnits,
-      unitPrice: row.unitPrice,
-      discountPercent: row.discountPercent,
-    }
-    const existing = linesByOrder.get(row.orderId)
-    if (existing) {
-      existing.lines.push(line)
-    } else {
-      linesByOrder.set(row.orderId, {
-        customerId: row.customerId,
-        status: row.status,
-        lines: [line],
-      })
-    }
-  }
-
-  for (const order of linesByOrder.values()) {
-    const list = byCustomer.get(order.customerId) ?? []
-    list.push({ status: order.status, net: orderTotals(order.lines).net })
-    byCustomer.set(order.customerId, list)
-  }
-
-  return byCustomer
 }

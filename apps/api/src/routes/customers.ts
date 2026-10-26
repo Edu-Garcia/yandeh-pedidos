@@ -2,7 +2,8 @@ import { resolvePriceTableId, searchCustomerProducts } from '@yandeh/shared'
 import { eq } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import type { Db } from '../db/client.js'
-import { clientes, produtos, tabelasPrecoItens } from '../db/schema.js'
+import { produtos, tabelasPrecoItens } from '../db/schema.js'
+import { findCustomerInSellerWallet } from '../http/seller-access.js'
 import {
   customerProductsQuerySchema,
   customerProductsResponseSchema,
@@ -22,25 +23,12 @@ export function registerCustomerRoutes(app: FastifyInstance, database: Db) {
       return reply.code(400).send({ message: 'Parâmetro q é obrigatório' })
     }
 
-    const [customer] = await database
-      .select({
-        id: clientes.id,
-        sellerId: clientes.vendedorId,
-        priceTableId: clientes.tabelaPrecoId,
-      })
-      .from(clientes)
-      .where(eq(clientes.id, request.params.id))
-      .limit(1)
-
-    if (!customer) {
-      return reply.code(404).send({ message: 'Cliente não encontrado' })
+    const access = await findCustomerInSellerWallet(database, sellerId.data, request.params.id)
+    if (!access.ok) {
+      return reply.code(access.statusCode).send({ message: access.message })
     }
 
-    if (customer.sellerId !== sellerId.data) {
-      return reply.code(403).send({ message: 'Cliente não pertence à carteira do vendedor' })
-    }
-
-    const table = resolvePriceTableId({ priceTableId: customer.priceTableId })
+    const table = resolvePriceTableId({ priceTableId: access.customer.priceTableId })
 
     const productRows = await database
       .select({
