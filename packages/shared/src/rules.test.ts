@@ -9,9 +9,3 @@ describe('constantes', () => {
     expect(FALLBACK_PRICE_TABLE_ID).toBe('TP01')
   })
 })
-
-describe('validateOrder', () => {
-  it.todo('bloqueia pedido com líquido abaixo de R$ 300,00')
-  it.todo('bloqueia C002 (R$ 350 disponíveis) com pedido de R$ 400')
-  it.todo('bloqueia C010 (crédito totalmente utilizado)')
-})
