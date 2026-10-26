@@ -1,4 +1,4 @@
-import type { Cents, Customer, OrderLineInput, Product, ValidationIssue } from './types'
+import type { Cents, OrderLineInput, Product, ValidationIssue } from './types'
 
 // STUBS — regras de negócio ainda NÃO implementadas (ver PRD.md §6).
 // Cada função deve ser pura, operar em centavos e ser coberta por testes antes da implementação.
@@ -8,11 +8,6 @@ export const FALLBACK_PRICE_TABLE_ID = 'TP01'
 
 const notImplemented = (name: string): never => {
   throw new Error(`${name}: não implementado`)
-}
-
-/** Crédito disponível = limite - utilizado - reservado (pedidos aguardando aprovação). */
-export function availableCredit(_customer: Customer, _reserved: Cents): Cents {
-  return notImplemented('availableCredit')
 }
 
 /** Lista de bloqueios para envio (vazia = pode enviar). */
