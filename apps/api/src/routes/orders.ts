@@ -12,8 +12,15 @@ import {
 import { eq, inArray } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import type { Db } from '../db/client.js'
-import { availableCreditForCustomer } from '../db/pending-credit.js'
-import { pedidos, pedidosItens, produtos, tabelasPrecoItens, vendedores } from '../db/schema.js'
+import { availableCreditForCustomer, lockCustomerForUpdate } from '../db/pending-credit.js'
+import {
+  clientes,
+  pedidos,
+  pedidosItens,
+  produtos,
+  tabelasPrecoItens,
+  vendedores,
+} from '../db/schema.js'
 import { env } from '../env.js'
 import { findCustomerInSellerWallet } from '../http/seller-access.js'
 import {
@@ -49,7 +56,7 @@ export function registerOrderRoutes(app: FastifyInstance, database: Db, deps: Or
     const table = resolvePriceTableId({ priceTableId: customer.priceTableId })
     const productIds = [...new Set(body.data.items.map((item) => item.productId))]
 
-    const [sellerRows, productRows, priceRows, credit] = await Promise.all([
+    const [sellerRows, productRows, priceRows] = await Promise.all([
       database
         .select({ discountAuthorityPercent: vendedores.alcadaDescontoPercentual })
         .from(vendedores)
@@ -80,7 +87,6 @@ export function registerOrderRoutes(app: FastifyInstance, database: Db, deps: Or
         })
         .from(tabelasPrecoItens)
         .where(eq(tabelasPrecoItens.tabelaPrecoId, table.tableId)),
-      availableCreditForCustomer(database, customer),
     ])
 
     const catalog = productsCatalogSchema.parse(productRows)
@@ -91,15 +97,6 @@ export function registerOrderRoutes(app: FastifyInstance, database: Db, deps: Or
       discountPercent: item.discountPercent,
     }))
 
-    const issues = validateOrder({
-      lines,
-      products: catalog,
-      availableCredit: credit,
-    })
-    if (issues.length > 0) {
-      return reply.code(422).send(validationIssuesSchema.parse(issues))
-    }
-
     const pricedLines: OrderLineInput[] = lines.map((line) => ({
       productId: line.productId,
       quantityUnits: line.quantityUnits,
@@ -108,11 +105,26 @@ export function registerOrderRoutes(app: FastifyInstance, database: Db, deps: Or
     }))
     const totals = orderTotals(pricedLines)
     const status = statusForDiscount(pricedLines, sellerRows[0]!.discountAuthorityPercent)
-    const orderId = randomUUID()
     const now = deps.now ?? (() => new Date())
     const orderDate = businessDate(now(), env.BUSINESS_TIMEZONE)
 
-    await database.transaction(async (tx) => {
+    const outcome = await database.transaction(async (tx) => {
+      const locked = await lockCustomerForUpdate(tx, customer.id)
+      if (!locked) {
+        return { ok: false as const, statusCode: 404 as const, message: 'Cliente não encontrado' }
+      }
+
+      const credit = await availableCreditForCustomer(tx, locked)
+      const issues = validateOrder({
+        lines,
+        products: catalog,
+        availableCredit: credit,
+      })
+      if (issues.length > 0) {
+        return { ok: false as const, statusCode: 422 as const, issues }
+      }
+
+      const orderId = randomUUID()
       await tx.insert(pedidos).values({
         id: orderId,
         clienteId: customer.id,
@@ -130,11 +142,27 @@ export function registerOrderRoutes(app: FastifyInstance, database: Db, deps: Or
           descontoPercentual: line.discountPercent,
         })),
       )
+
+      if (status === 'Enviado') {
+        await tx
+          .update(clientes)
+          .set({ creditoUtilizadoCentavos: locked.creditUsed + totals.net })
+          .where(eq(clientes.id, locked.id))
+      }
+
+      return { ok: true as const, orderId }
     })
+
+    if (!outcome.ok) {
+      if (outcome.statusCode === 422) {
+        return reply.code(422).send(validationIssuesSchema.parse(outcome.issues))
+      }
+      return reply.code(outcome.statusCode).send({ message: outcome.message })
+    }
 
     return reply.code(201).send(
       createdOrderSchema.parse({
-        id: orderId,
+        id: outcome.orderId,
         customerId: customer.id,
         sellerId: sellerId.data,
         status,

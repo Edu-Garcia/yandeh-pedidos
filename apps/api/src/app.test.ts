@@ -4,9 +4,23 @@ import { eq, inArray, notInArray } from 'drizzle-orm'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { buildApp } from './app.js'
 import { db, pool } from './db/client.js'
-import { pedidos, pedidosItens } from './db/schema.js'
+import { clientes, pedidos, pedidosItens } from './db/schema.js'
 
 const SEED_ORDER_IDS = ['PH001', 'PH002', 'PH003', 'PH004']
+
+/** `credito_utilizado` do seed em centavos — POST Enviado altera a coluna. */
+const SEED_CREDIT_USED = {
+  C001: 120000,
+  C002: 1165000,
+  C003: 0,
+  C004: 0,
+  C005: 830000,
+  C006: 390000,
+  C007: 150000,
+  C008: 50000,
+  C009: 200000,
+  C010: 450000,
+} as const
 
 function civilDate(value: string | Date | null | undefined): string {
   if (value instanceof Date) {
@@ -32,6 +46,19 @@ async function deleteNonSeedOrders() {
   }
   await db.delete(pedidosItens).where(inArray(pedidosItens.pedidoId, ids))
   await db.delete(pedidos).where(inArray(pedidos.id, ids))
+}
+
+async function restoreSeedCreditUsed() {
+  await Promise.all(
+    Object.entries(SEED_CREDIT_USED).map(([id, creditUsed]) =>
+      db.update(clientes).set({ creditoUtilizadoCentavos: creditUsed }).where(eq(clientes.id, id)),
+    ),
+  )
+}
+
+async function resetOrdersAndCredit() {
+  await deleteNonSeedOrders()
+  await restoreSeedCreditUsed()
 }
 
 afterAll(async () => {
@@ -215,8 +242,8 @@ describe('GET /customers/:id/products', () => {
 })
 
 describe('POST /orders', () => {
-  beforeEach(deleteNonSeedOrders)
-  afterEach(deleteNonSeedOrders)
+  beforeEach(resetOrdersAndCredit)
+  afterEach(resetOrdersAndCredit)
 
   it('exemplo C001 cria pedido Enviado com líquido 51930', async () => {
     const app = buildApp(db)
@@ -267,6 +294,11 @@ describe('POST /orders', () => {
       { productId: 'P006', quantity: 40, unitPrice: 333, discountPercent: 2 },
       { productId: 'P010', quantity: 24, unitPrice: 499, discountPercent: 0 },
     ])
+    const [c001] = await db
+      .select({ creditUsed: clientes.creditoUtilizadoCentavos })
+      .from(clientes)
+      .where(eq(clientes.id, 'C001'))
+    expect(c001?.creditUsed).toBe(SEED_CREDIT_USED.C001 + 51930)
     await app.close()
   })
 
@@ -294,6 +326,11 @@ describe('POST /orders', () => {
     const body = res.json() as { status: string; totals: { net: number } }
     expect(body.status).toBe('Aguardando aprovação')
     expect(body.totals.net).toBe(50316)
+    const [c001] = await db
+      .select({ creditUsed: clientes.creditoUtilizadoCentavos })
+      .from(clientes)
+      .where(eq(clientes.id, 'C001'))
+    expect(c001?.creditUsed).toBe(SEED_CREDIT_USED.C001)
     await app.close()
   })
 
@@ -348,6 +385,115 @@ describe('POST /orders', () => {
     expect(frozen.toISOString().slice(0, 10)).toBe('2026-10-27')
     expect(civilDate(order?.data)).toBe('2026-10-26')
     expect(civilDate(order?.data)).toBe(businessDate(frozen, 'America/Fortaleza'))
+    await app.close()
+  })
+
+  it('C002 com P001 qty 16 na TP02 retorna 422 INSUFFICIENT_CREDIT', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({
+      method: 'POST',
+      url: '/orders',
+      headers: {
+        'x-seller-id': 'V01',
+        'content-type': 'application/json',
+        'idempotency-key': randomUUID(),
+      },
+      payload: {
+        customerId: 'C002',
+        items: [{ productId: 'P001', quantity: 16, discountPercent: 0 }],
+      },
+    })
+
+    expect(res.statusCode).toBe(422)
+    expect(res.json()).toContainEqual({
+      code: 'INSUFFICIENT_CREDIT',
+      message: 'Total líquido acima do crédito disponível',
+      available: 35000,
+      net: 40464,
+    })
+    const extras = await db
+      .select({ id: pedidos.id })
+      .from(pedidos)
+      .where(notInArray(pedidos.id, SEED_ORDER_IDS))
+    expect(extras).toHaveLength(0)
+    await app.close()
+  })
+
+  it('C002 pendente de 32000 reserva crédito e disponível cai para 3000', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({
+      method: 'POST',
+      url: '/orders',
+      headers: {
+        'x-seller-id': 'V01',
+        'content-type': 'application/json',
+        'idempotency-key': randomUUID(),
+      },
+      payload: {
+        customerId: 'C002',
+        items: [
+          { productId: 'P001', quantity: 11, discountPercent: 6 },
+          { productId: 'P008', quantity: 13, discountPercent: 0 },
+        ],
+      },
+    })
+
+    expect(res.statusCode).toBe(201)
+    const body = res.json() as { status: string; totals: { net: number } }
+    expect(body.status).toBe('Aguardando aprovação')
+    expect(body.totals.net).toBe(32000)
+
+    const [c002] = await db
+      .select({ creditUsed: clientes.creditoUtilizadoCentavos })
+      .from(clientes)
+      .where(eq(clientes.id, 'C002'))
+    expect(c002?.creditUsed).toBe(SEED_CREDIT_USED.C002)
+
+    const wallet = await app.inject({ method: 'GET', url: '/sellers/V01/customers' })
+    expect(wallet.statusCode).toBe(200)
+    const customers = wallet.json() as Array<{ id: string; availableCredit: number }>
+    expect(customers.find((customer) => customer.id === 'C002')?.availableCredit).toBe(3000)
+    await app.close()
+  })
+
+  it('dois POSTs concorrentes que somados estouram o crédito: só um passa', async () => {
+    const app = buildApp(db)
+    const payload = {
+      customerId: 'C002',
+      items: [{ productId: 'P001', quantity: 12, discountPercent: 0 }],
+    }
+    const headers = () => ({
+      'x-seller-id': 'V01',
+      'content-type': 'application/json',
+      'idempotency-key': randomUUID(),
+    })
+
+    const [first, second] = await Promise.all([
+      app.inject({ method: 'POST', url: '/orders', headers: headers(), payload }),
+      app.inject({ method: 'POST', url: '/orders', headers: headers(), payload }),
+    ])
+
+    const statuses = [first.statusCode, second.statusCode].sort()
+    expect(statuses).toEqual([201, 422])
+
+    const failed = first.statusCode === 422 ? first : second
+    const issues = failed.json() as Array<{ code: string; available: number; net: number }>
+    expect(issues).toContainEqual({
+      code: 'INSUFFICIENT_CREDIT',
+      message: 'Total líquido acima do crédito disponível',
+      available: 4652,
+      net: 30348,
+    })
+
+    const extras = await db.select().from(pedidos).where(notInArray(pedidos.id, SEED_ORDER_IDS))
+    expect(extras).toHaveLength(1)
+    expect(extras[0]?.status).toBe('Enviado')
+
+    const [c002] = await db
+      .select({ creditUsed: clientes.creditoUtilizadoCentavos })
+      .from(clientes)
+      .where(eq(clientes.id, 'C002'))
+    expect(c002?.creditUsed).toBe(SEED_CREDIT_USED.C002 + 30348)
     await app.close()
   })
 
