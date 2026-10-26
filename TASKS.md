@@ -33,12 +33,12 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | F1 — Regras puras (`shared`)      | 9       | 9      |
 | F2 — Banco e seed                 | 1       | 1      |
 | F3 — API (req. 1–5, 7)            | 8       | 8      |
-| F4 — Telas (req. 1–5, 7)          | 5       | 0      |
+| F4 — Telas (req. 1–5, 7)          | 5       | 1      |
 | F5 — Histórico e repetir (req. 8) | 2       | 0      |
 | F6 — Supervisor (fecha req. 5)    | 2       | 0      |
 | F7 — Offline parcial (req. 9)     | 2       | 0      |
 | F8 — Entrega e docs               | 4       | 0      |
-| **Total**                         | **34**  | **19** |
+| **Total**                         | **34**  | **20** |
 | Opcionais                         | 3       | 0      |
 
 > Sem estimativas de tempo: com IA acelerando a implementação, elas não refletem dados reais. Prioridade: núcleo (F1–F4 + F8, req. 1–7) primeiro. Se o prazo apertar, corte na ordem: opcionais → F7 → F6 (T-25) → F5, e registre em README "o que ficou de fora".
@@ -255,13 +255,15 @@ Validação comum: `pnpm --filter @yandeh/api test` (Postgres de teste via `dock
 
 Validação comum: `pnpm --filter @yandeh/web typecheck && pnpm --filter @yandeh/web build` + passos manuais em viewport 390 px.
 
-### [ ] T-17 — Cliente HTTP, store de sessão e tela "Quem é você?"
+### [x] T-17 — Cliente HTTP, store de sessão e tela "Quem é você?"
 
 - **Refs:** req. 1; PRD §7.1; A1.
 - **Depende de:** T-11
-- **Aceite:** escolher V01 persiste sessão (recarregar mantém) e leva à carteira; S01 leva a Aprovações; sem sessão → redireciona para seleção.
-- **Validação manual:** `docker compose up --build`; abrir http://localhost:5173 em viewport ~390 px. Em "Quem é você?", escolher V01 Carlos Menezes → vai para a carteira; recarregar mantém a sessão V01. Escolher S01 Marta Fernandes → tela Aprovações (`/supervisor`). Abrir `/clientes` sem sessão → redireciona para a seleção. Evidência: screenshots da seleção, da carteira após reload e do redirect.
+- **Aceite:** escolher V01 persiste sessão (recarregar mantém) e leva à carteira; S01 leva a Aprovações; sem sessão, qualquer URL (existente ou não) redireciona para a seleção `/`; com sessão, rota de outro papel ou URL inexistente mostra o mesmo 404 ("Página não encontrada") sem mudar a URL, com link para o início do papel; `/` continua acessível para trocar de usuário.
+- **Validação:** `pnpm --filter @yandeh/web typecheck && pnpm --filter @yandeh/web build`; `pnpm --filter @yandeh/web test` (store de sessão + guard de rota e papel).
+- **Validação manual:** `docker compose up --build`. Viewport ~390 px em http://localhost:5173. Escolher V01 Carlos Menezes → `/clientes` (Minha carteira); recarregar mantém a sessão V01. Escolher S01 Marta Fernandes → `/supervisor` (Aprovações). Sem sessão, abrir `/clientes` ou URL inexistente → `/`. Com V01, abrir `/supervisor` e `/nao-existe` → o mesmo 404, URL mantida. Com S01, abrir `/clientes` → o mesmo 404. Evidência: screenshots da seleção, da carteira após reload, do redirect (URL final visível) e dos 404s (artifacts, fora do repo).
 - **Commit:** `feat(web): login simulado com seleção de vendedor`
+- **Status:** feito
 
 ### [ ] T-18 — Tela "Minha carteira"
 

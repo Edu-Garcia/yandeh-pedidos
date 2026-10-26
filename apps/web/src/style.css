@@ -1,1 +1,23 @@
 @import 'tailwindcss';
+
+@theme {
+  --font-display: 'Bricolage Grotesque', ui-serif, Georgia, serif;
+  --font-sans: 'Atkinson Hyperlegible', ui-sans-serif, system-ui, sans-serif;
+  --color-floor: #c8d0c6;
+  --color-counter: #2e322c;
+  --color-safety: #e6c200;
+  --color-produce: #1f5c45;
+  --color-steel: #5c6560;
+  --color-receipt: #f3f0e4;
+}
+
+html,
+body,
+#app {
+  min-height: 100dvh;
+}
+
+body {
+  margin: 0;
+  background: var(--color-floor);
+}
