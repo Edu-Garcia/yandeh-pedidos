@@ -55,6 +55,61 @@ describe('GET /supervisors', () => {
   })
 })
 
+describe('GET /sellers/:id/customers', () => {
+  it('V01 retorna exatamente C001–C004 com tabela efetiva e crédito disponível', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({ method: 'GET', url: '/sellers/V01/customers' })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual([
+      {
+        id: 'C001',
+        tradeName: 'Mercadinho São José',
+        city: 'Fortaleza',
+        uf: 'CE',
+        priceTableId: 'TP01',
+        isFallback: false,
+        availableCredit: 380000,
+      },
+      {
+        id: 'C002',
+        tradeName: 'Minibox Bom Preço',
+        city: 'Fortaleza',
+        uf: 'CE',
+        priceTableId: 'TP02',
+        isFallback: false,
+        availableCredit: 35000,
+      },
+      {
+        id: 'C003',
+        tradeName: 'Conveniência Esquina',
+        city: 'Caucaia',
+        uf: 'CE',
+        priceTableId: 'TP01',
+        isFallback: false,
+        availableCredit: 250000,
+      },
+      {
+        id: 'C004',
+        tradeName: 'Mercearia Dona Lúcia',
+        city: 'Maracanaú',
+        uf: 'CE',
+        priceTableId: 'TP01',
+        isFallback: true,
+        availableCredit: 300000,
+      },
+    ])
+    await app.close()
+  })
+
+  it('vendedor inexistente retorna 404', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({ method: 'GET', url: '/sellers/V99/customers' })
+    expect(res.statusCode).toBe(404)
+    expect(res.json()).toEqual({ message: 'Vendedor não encontrado' })
+    await app.close()
+  })
+})
+
 describe('POST /orders', () => {
   it.todo('com a mesma Idempotency-Key retorna o pedido já criado')
   it.todo('revalida as regras do @yandeh/shared e rejeita pedido abaixo do mínimo')
