@@ -16,6 +16,6 @@ export function buildApp(database: Db, deps: AppDeps = {}) {
   registerCustomerRoutes(app, database)
   registerOrderRoutes(app, database, deps)
 
-  // TODO (ver PRD.md §8): rotas de histórico e aprovações.
+  // TODO (ver PRD.md §8): rotas de aprovações do supervisor.
   return app
 }

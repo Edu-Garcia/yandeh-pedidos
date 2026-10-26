@@ -1,10 +1,15 @@
 import { randomUUID } from 'node:crypto'
-import { businessDate } from '@yandeh/shared'
+import {
+  businessDate,
+  orderTotals,
+  type CustomerProduct,
+  type OrderLineInput,
+} from '@yandeh/shared'
 import { eq, inArray, notInArray } from 'drizzle-orm'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { buildApp } from './app.js'
 import { db, pool } from './db/client.js'
-import { clientes, pedidos, pedidosItens } from './db/schema.js'
+import { clientes, pedidos, pedidosItens, produtos } from './db/schema.js'
 
 const SEED_ORDER_IDS = ['PH001', 'PH002', 'PH003', 'PH004']
 
@@ -34,6 +39,109 @@ const exampleC001Items = [
   { productId: 'P006', quantity: 40, discountPercent: 2 },
   { productId: 'P010', quantity: 24, discountPercent: 0 },
 ]
+
+/** Preços/descontos congelados do seed (PH001 / PH002 / PH004). */
+const historyPH001Lines: OrderLineInput[] = [
+  { productId: 'P001', quantityUnits: 10, unitPrice: 2590, discountPercent: 0 },
+  { productId: 'P006', quantityUnits: 40, unitPrice: 329, discountPercent: 2 },
+  { productId: 'P010', quantityUnits: 24, unitPrice: 489, discountPercent: 0 },
+  { productId: 'P022', quantityUnits: 30, unitPrice: 259, discountPercent: 0 },
+]
+
+const historyPH002Lines: OrderLineInput[] = [
+  { productId: 'P002', quantityUnits: 15, unitPrice: 749, discountPercent: 5 },
+  { productId: 'P011', quantityUnits: 12, unitPrice: 879, discountPercent: 0 },
+  { productId: 'P015', quantityUnits: 24, unitPrice: 239, discountPercent: 0 },
+]
+
+const historyPH004Lines: OrderLineInput[] = [
+  { productId: 'P003', quantityUnits: 20, unitPrice: 513, discountPercent: 0 },
+]
+
+const customerProductP001: CustomerProduct = {
+  id: 'P001',
+  sku: 'SKU-1000',
+  ean: '7891958224128',
+  description: 'Arroz Branco Tipo 1 5kg',
+  category: 'mercearia',
+  brand: 'Grão Fino',
+  saleUnit: 'UN',
+  packFactor: 1,
+  multipleOnly: false,
+  unitPrice: 2690,
+}
+
+const customerProductP003: CustomerProduct = {
+  id: 'P003',
+  sku: 'SKU-1002',
+  ean: '7891133568863',
+  description: 'Açúcar Cristal 1kg',
+  category: 'mercearia',
+  brand: 'Doce Vale',
+  saleUnit: 'FD',
+  packFactor: 10,
+  multipleOnly: true,
+  unitPrice: 513,
+}
+
+const customerProductP004: CustomerProduct = {
+  id: 'P004',
+  sku: 'SKU-1003',
+  ean: '7891469138105',
+  description: 'Óleo de Soja 900ml',
+  category: 'mercearia',
+  brand: 'Soyara',
+  saleUnit: 'CX',
+  packFactor: 20,
+  multipleOnly: false,
+  unitPrice: 719,
+}
+
+const customerProductP006: CustomerProduct = {
+  id: 'P006',
+  sku: 'SKU-1005',
+  ean: '7891399588384',
+  description: 'Macarrão Espaguete 500g',
+  category: 'mercearia',
+  brand: 'Massa Boa',
+  saleUnit: 'FD',
+  packFactor: 20,
+  multipleOnly: true,
+  unitPrice: 333,
+}
+
+const customerProductP010: CustomerProduct = {
+  id: 'P010',
+  sku: 'SKU-1009',
+  ean: '7891216687320',
+  description: 'Leite UHT Integral 1L',
+  category: 'bebidas',
+  brand: 'Vale Verde',
+  saleUnit: 'CX',
+  packFactor: 12,
+  multipleOnly: true,
+  unitPrice: 499,
+}
+
+const SEED_PACK_FACTOR = { P004: 20, P006: 20 } as const
+
+async function restoreSeedPackFactors() {
+  await Promise.all([
+    db
+      .update(produtos)
+      .set({ fatorEmbalagem: SEED_PACK_FACTOR.P004 })
+      .where(eq(produtos.id, 'P004')),
+    db
+      .update(produtos)
+      .set({ fatorEmbalagem: SEED_PACK_FACTOR.P006 })
+      .where(eq(produtos.id, 'P006')),
+  ])
+}
+
+async function countOrders(): Promise<number> {
+  const rows = await db.select({ id: pedidos.id }).from(pedidos)
+  return rows.length
+}
 
 async function deleteNonSeedOrders() {
   const extras = await db
@@ -724,6 +832,351 @@ describe('POST /orders', () => {
       .from(clientes)
       .where(eq(clientes.id, 'C001'))
     expect(c001?.creditUsed).toBe(SEED_CREDIT_USED.C001 + 51930)
+    await app.close()
+  })
+})
+
+describe('GET /customers/:id/orders', () => {
+  beforeEach(resetOrdersAndCredit)
+  afterEach(resetOrdersAndCredit)
+
+  it('C001 lista PH001 e PH002 com status e total líquido congelado, mais recentes primeiro', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({
+      method: 'GET',
+      url: '/customers/C001/orders',
+      headers: { 'x-seller-id': 'V01' },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual([
+      {
+        id: 'PH002',
+        date: '2026-10-02',
+        status: 'Faturado',
+        total: orderTotals(historyPH002Lines).net,
+      },
+      {
+        id: 'PH001',
+        date: '2026-09-15',
+        status: 'Faturado',
+        total: orderTotals(historyPH001Lines).net,
+      },
+    ])
+    await app.close()
+  })
+
+  it('C006 lista o PH004 Cancelado com status e total', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({
+      method: 'GET',
+      url: '/customers/C006/orders',
+      headers: { 'x-seller-id': 'V02' },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual([
+      {
+        id: 'PH004',
+        date: '2026-10-05',
+        status: 'Cancelado',
+        total: orderTotals(historyPH004Lines).net,
+      },
+    ])
+    await app.close()
+  })
+
+  it('cliente de outra carteira retorna 403', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({
+      method: 'GET',
+      url: '/customers/C005/orders',
+      headers: { 'x-seller-id': 'V01' },
+    })
+    expect(res.statusCode).toBe(403)
+    expect(res.json()).toEqual({ message: 'Cliente não pertence à carteira do vendedor' })
+    await app.close()
+  })
+
+  it('cliente inexistente retorna 404', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({
+      method: 'GET',
+      url: '/customers/C999/orders',
+      headers: { 'x-seller-id': 'V01' },
+    })
+    expect(res.statusCode).toBe(404)
+    expect(res.json()).toEqual({ message: 'Cliente não encontrado' })
+    await app.close()
+  })
+
+  it('sem X-Seller-Id retorna 400', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({ method: 'GET', url: '/customers/C001/orders' })
+    expect(res.statusCode).toBe(400)
+    expect(res.json()).toEqual({ message: 'Cabeçalho X-Seller-Id é obrigatório' })
+    await app.close()
+  })
+})
+
+describe('POST /customers/:id/orders/:orderId/repeat', () => {
+  beforeEach(async () => {
+    await restoreSeedPackFactors()
+    await resetOrdersAndCredit()
+  })
+  afterEach(async () => {
+    await restoreSeedPackFactors()
+    await resetOrdersAndCredit()
+  })
+
+  it('PH001 monta rascunho sem P022, preço atual e descontos 0, sem criar pedido', async () => {
+    const app = buildApp(db)
+    const before = await countOrders()
+    const res = await app.inject({
+      method: 'POST',
+      url: '/customers/C001/orders/PH001/repeat',
+      headers: { 'x-seller-id': 'V01' },
+    })
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json() as {
+      lines: Array<{
+        productId: string
+        product: CustomerProduct
+        quantityUnits: number
+        discountPercent: number
+        lots: number | null
+      }>
+      removed: Array<{ productId: string; description: string; ean: string; reason: string }>
+      notices: unknown[]
+    }
+    expect(body.lines.map((line) => line.productId)).toEqual(['P001', 'P006', 'P010'])
+    expect(body.removed).toEqual([
+      {
+        productId: 'P022',
+        description: 'Biscoito Recheado Chocolate 140g',
+        ean: '7891366875370',
+        reason: 'Produto inativo',
+      },
+    ])
+    expect(body.lines[0]).toEqual({
+      productId: 'P001',
+      product: customerProductP001,
+      quantityUnits: 10,
+      discountPercent: 0,
+      lots: 10,
+    })
+    expect(body.lines[1]).toEqual({
+      productId: 'P006',
+      product: customerProductP006,
+      quantityUnits: 40,
+      discountPercent: 0,
+      lots: 2,
+    })
+    expect(body.lines[2]).toEqual({
+      productId: 'P010',
+      product: customerProductP010,
+      quantityUnits: 24,
+      discountPercent: 0,
+      lots: 2,
+    })
+    expect(body.lines.every((line) => line.discountPercent === 0)).toBe(true)
+    expect(body.notices).toEqual([])
+    expect(await countOrders()).toBe(before)
+    await app.close()
+  })
+
+  it('PH004 Cancelado é repetível e não cria pedido', async () => {
+    const app = buildApp(db)
+    const before = await countOrders()
+    const res = await app.inject({
+      method: 'POST',
+      url: '/customers/C006/orders/PH004/repeat',
+      headers: { 'x-seller-id': 'V02' },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual({
+      lines: [
+        {
+          productId: 'P003',
+          product: customerProductP003,
+          quantityUnits: 20,
+          discountPercent: 0,
+          lots: 2,
+        },
+      ],
+      removed: [],
+      notices: [],
+    })
+    expect(await countOrders()).toBe(before)
+    await app.close()
+  })
+
+  it('produto só-múltiplo com fator atual 12 e 30 un ajusta lote para cima', async () => {
+    await db.update(produtos).set({ fatorEmbalagem: 12 }).where(eq(produtos.id, 'P006'))
+    await db.insert(pedidos).values({
+      id: 'PH-FACTOR-MULT',
+      clienteId: 'C001',
+      vendedorId: 'V01',
+      data: '2026-10-20',
+      status: 'Faturado',
+    })
+    await db.insert(pedidosItens).values({
+      pedidoId: 'PH-FACTOR-MULT',
+      produtoId: 'P006',
+      quantidade: 30,
+      precoUnidadeCentavos: 329,
+      descontoPercentual: 0,
+    })
+
+    const app = buildApp(db)
+    const res = await app.inject({
+      method: 'POST',
+      url: '/customers/C001/orders/PH-FACTOR-MULT/repeat',
+      headers: { 'x-seller-id': 'V01' },
+    })
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json() as { notices: Array<{ message: string }> }
+    expect(body).toEqual({
+      lines: [
+        {
+          productId: 'P006',
+          product: { ...customerProductP006, packFactor: 12 },
+          quantityUnits: 36,
+          discountPercent: 0,
+          lots: 3,
+        },
+      ],
+      removed: [],
+      notices: [
+        {
+          code: 'PACK_FACTOR_CHANGED',
+          productId: 'P006',
+          description: 'Macarrão Espaguete 500g',
+          newFactor: 12,
+          lots: 3,
+          units: 36,
+          message:
+            'A quantidade de unidades por lote mudou para 12; a quantidade foi ajustada para 3 lote(s) (36 unidades)',
+        },
+      ],
+    })
+    expect(body.notices[0]?.message).not.toMatch(/P0\d{2}/)
+    await app.close()
+  })
+
+  it('produto não só-múltiplo com fator 12 e 7 un mantém unidades e Lote vazio', async () => {
+    await db.update(produtos).set({ fatorEmbalagem: 12 }).where(eq(produtos.id, 'P004'))
+    await db.insert(pedidos).values({
+      id: 'PH-FACTOR-UNIT',
+      clienteId: 'C001',
+      vendedorId: 'V01',
+      data: '2026-10-21',
+      status: 'Faturado',
+    })
+    await db.insert(pedidosItens).values({
+      pedidoId: 'PH-FACTOR-UNIT',
+      produtoId: 'P004',
+      quantidade: 7,
+      precoUnidadeCentavos: 719,
+      descontoPercentual: 0,
+    })
+
+    const app = buildApp(db)
+    const res = await app.inject({
+      method: 'POST',
+      url: '/customers/C001/orders/PH-FACTOR-UNIT/repeat',
+      headers: { 'x-seller-id': 'V01' },
+    })
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json() as { notices: Array<{ message: string }> }
+    expect(body).toEqual({
+      lines: [
+        {
+          productId: 'P004',
+          product: { ...customerProductP004, packFactor: 12 },
+          quantityUnits: 7,
+          discountPercent: 0,
+          lots: null,
+        },
+      ],
+      removed: [],
+      notices: [
+        {
+          code: 'LOT_NOT_EXACT',
+          productId: 'P004',
+          description: 'Óleo de Soja 900ml',
+          newFactor: 12,
+          lots: null,
+          units: 7,
+          message:
+            'As unidades do histórico não fecham um lote com o fator atual (12); o campo Lote ficou vazio.',
+        },
+      ],
+    })
+    expect(body.notices[0]?.message).not.toMatch(/P0\d{2}/)
+    await app.close()
+  })
+
+  it('cliente de outra carteira retorna 403', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({
+      method: 'POST',
+      url: '/customers/C005/orders/PH003/repeat',
+      headers: { 'x-seller-id': 'V01' },
+    })
+    expect(res.statusCode).toBe(403)
+    expect(res.json()).toEqual({ message: 'Cliente não pertence à carteira do vendedor' })
+    await app.close()
+  })
+
+  it('cliente inexistente retorna 404', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({
+      method: 'POST',
+      url: '/customers/C999/orders/PH001/repeat',
+      headers: { 'x-seller-id': 'V01' },
+    })
+    expect(res.statusCode).toBe(404)
+    expect(res.json()).toEqual({ message: 'Cliente não encontrado' })
+    await app.close()
+  })
+
+  it('pedido inexistente retorna 404', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({
+      method: 'POST',
+      url: '/customers/C001/orders/PH999/repeat',
+      headers: { 'x-seller-id': 'V01' },
+    })
+    expect(res.statusCode).toBe(404)
+    expect(res.json()).toEqual({ message: 'Pedido não encontrado' })
+    await app.close()
+  })
+
+  it('pedido de outro cliente retorna 404 sem vazar existência', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({
+      method: 'POST',
+      url: '/customers/C001/orders/PH004/repeat',
+      headers: { 'x-seller-id': 'V01' },
+    })
+    expect(res.statusCode).toBe(404)
+    expect(res.json()).toEqual({ message: 'Pedido não encontrado' })
+    await app.close()
+  })
+
+  it('sem X-Seller-Id retorna 400', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({
+      method: 'POST',
+      url: '/customers/C001/orders/PH001/repeat',
+    })
+    expect(res.statusCode).toBe(400)
+    expect(res.json()).toEqual({ message: 'Cabeçalho X-Seller-Id é obrigatório' })
     await app.close()
   })
 })
