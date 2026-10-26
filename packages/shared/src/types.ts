@@ -51,6 +51,18 @@ export interface EffectivePriceTable {
   isFallback: boolean
 }
 
+/** Cliente da carteira do vendedor (RN01, RN02, RN09): tabela efetiva + crédito disponível. */
+export interface SellerCustomer {
+  id: string
+  tradeName: string
+  city: string
+  uf: string
+  /** Tabela efetiva (`resolvePriceTableId`), não o id cru do cadastro. */
+  priceTableId: string
+  isFallback: boolean
+  availableCredit: Cents
+}
+
 export interface OrderLineInput {
   productId: string
   /** Quantidade SEMPRE em unidades. */

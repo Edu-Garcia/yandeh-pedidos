@@ -1,4 +1,4 @@
-import type { Seller, Supervisor } from '@yandeh/shared'
+import type { Seller, SellerCustomer, Supervisor } from '@yandeh/shared'
 import { z } from 'zod'
 
 export const sellerSchema = z.object({
@@ -16,3 +16,15 @@ export const supervisorSchema = z.object({
 }) satisfies z.ZodType<Supervisor>
 
 export const supervisorsResponseSchema = z.array(supervisorSchema)
+
+export const sellerCustomerSchema = z.object({
+  id: z.string(),
+  tradeName: z.string(),
+  city: z.string(),
+  uf: z.string(),
+  priceTableId: z.string(),
+  isFallback: z.boolean(),
+  availableCredit: z.number(),
+}) satisfies z.ZodType<SellerCustomer>
+
+export const sellerCustomersResponseSchema = z.array(sellerCustomerSchema)
