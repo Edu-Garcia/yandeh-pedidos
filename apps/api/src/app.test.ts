@@ -1,6 +1,30 @@
-import { afterAll, describe, expect, it } from 'vitest'
+import { randomUUID } from 'node:crypto'
+import { inArray, notInArray } from 'drizzle-orm'
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { buildApp } from './app.js'
 import { db, pool } from './db/client.js'
+import { pedidos, pedidosItens } from './db/schema.js'
+
+const SEED_ORDER_IDS = ['PH001', 'PH002', 'PH003', 'PH004']
+
+const exampleC001Items = [
+  { productId: 'P001', quantity: 10, discountPercent: 0 },
+  { productId: 'P006', quantity: 40, discountPercent: 2 },
+  { productId: 'P010', quantity: 24, discountPercent: 0 },
+]
+
+async function deleteNonSeedOrders() {
+  const extras = await db
+    .select({ id: pedidos.id })
+    .from(pedidos)
+    .where(notInArray(pedidos.id, SEED_ORDER_IDS))
+  const ids = extras.map((row) => row.id)
+  if (ids.length === 0) {
+    return
+  }
+  await db.delete(pedidosItens).where(inArray(pedidosItens.pedidoId, ids))
+  await db.delete(pedidos).where(inArray(pedidos.id, ids))
+}
 
 afterAll(async () => {
   await pool.end()
@@ -183,6 +207,133 @@ describe('GET /customers/:id/products', () => {
 })
 
 describe('POST /orders', () => {
+  beforeEach(deleteNonSeedOrders)
+  afterEach(deleteNonSeedOrders)
+
+  it('exemplo C001 cria pedido Enviado com líquido 51930', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({
+      method: 'POST',
+      url: '/orders',
+      headers: {
+        'x-seller-id': 'V01',
+        'content-type': 'application/json',
+        'idempotency-key': randomUUID(),
+      },
+      payload: { customerId: 'C001', items: exampleC001Items },
+    })
+
+    expect(res.statusCode).toBe(201)
+    const body = res.json() as {
+      id: string
+      status: string
+      totals: { gross: number; discount: number; net: number }
+      items: Array<{ productId: string; unitPrice: number }>
+    }
+    expect(body.status).toBe('Enviado')
+    expect(body.totals).toEqual({ gross: 52196, discount: 266, net: 51930 })
+    expect(body.items).toEqual([
+      { productId: 'P001', quantity: 10, unitPrice: 2690, discountPercent: 0 },
+      { productId: 'P006', quantity: 40, unitPrice: 333, discountPercent: 2 },
+      { productId: 'P010', quantity: 24, unitPrice: 499, discountPercent: 0 },
+    ])
+
+    const [order] = await db
+      .select()
+      .from(pedidos)
+      .where(inArray(pedidos.id, [body.id]))
+    expect(order?.status).toBe('Enviado')
+    const lines = await db
+      .select()
+      .from(pedidosItens)
+      .where(inArray(pedidosItens.pedidoId, [body.id]))
+    expect(
+      lines.map((line) => ({
+        productId: line.produtoId,
+        quantity: line.quantidade,
+        unitPrice: line.precoUnidadeCentavos,
+        discountPercent: line.descontoPercentual,
+      })),
+    ).toEqual([
+      { productId: 'P001', quantity: 10, unitPrice: 2690, discountPercent: 0 },
+      { productId: 'P006', quantity: 40, unitPrice: 333, discountPercent: 2 },
+      { productId: 'P010', quantity: 24, unitPrice: 499, discountPercent: 0 },
+    ])
+    await app.close()
+  })
+
+  it('arroz a 6% cria pedido Aguardando aprovação', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({
+      method: 'POST',
+      url: '/orders',
+      headers: {
+        'x-seller-id': 'V01',
+        'content-type': 'application/json',
+        'idempotency-key': randomUUID(),
+      },
+      payload: {
+        customerId: 'C001',
+        items: [
+          { productId: 'P001', quantity: 10, discountPercent: 6 },
+          { productId: 'P006', quantity: 40, discountPercent: 2 },
+          { productId: 'P010', quantity: 24, discountPercent: 0 },
+        ],
+      },
+    })
+
+    expect(res.statusCode).toBe(201)
+    const body = res.json() as { status: string; totals: { net: number } }
+    expect(body.status).toBe('Aguardando aprovação')
+    expect(body.totals.net).toBe(50316)
+    await app.close()
+  })
+
+  it('líquido abaixo do mínimo retorna 422 BELOW_MINIMUM', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({
+      method: 'POST',
+      url: '/orders',
+      headers: {
+        'x-seller-id': 'V01',
+        'content-type': 'application/json',
+        'idempotency-key': randomUUID(),
+      },
+      payload: {
+        customerId: 'C001',
+        items: [{ productId: 'P001', quantity: 1, discountPercent: 0 }],
+      },
+    })
+
+    expect(res.statusCode).toBe(422)
+    const body = res.json() as Array<{ code: string; minimum: number; net: number }>
+    expect(body.some((issue) => issue.code === 'BELOW_MINIMUM')).toBe(true)
+    expect(body).toContainEqual({
+      code: 'BELOW_MINIMUM',
+      message: 'Total líquido abaixo de R$ 300,00',
+      minimum: 30000,
+      net: 2690,
+    })
+    await app.close()
+  })
+
+  it('V01 pedindo para C005 retorna 403', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({
+      method: 'POST',
+      url: '/orders',
+      headers: {
+        'x-seller-id': 'V01',
+        'content-type': 'application/json',
+        'idempotency-key': randomUUID(),
+      },
+      payload: { customerId: 'C005', items: exampleC001Items },
+    })
+
+    expect(res.statusCode).toBe(403)
+    expect(res.json()).toEqual({ message: 'Cliente não pertence à carteira do vendedor' })
+    await app.close()
+  })
+
   it.todo('com a mesma Idempotency-Key retorna o pedido já criado')
-  it.todo('revalida as regras do @yandeh/shared e rejeita pedido abaixo do mínimo')
 })
