@@ -6,7 +6,9 @@ import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, type RepeatDraftResponse } from '@/api'
 import { PRODUCT_SEARCH_DEBOUNCE_MS } from '@/product-search'
+import { DRAFT_LOCKED_MESSAGE } from '@/submit-retry'
 import { routes } from '@/router'
+import { useOnlineStore } from '@/stores/online'
 import {
   DISCOUNT_ERROR,
   DRAFT_STORAGE_KEY,
@@ -300,6 +302,10 @@ describe('OrderPage', () => {
   afterEach(() => {
     vi.useRealTimers()
     vi.unstubAllGlobals()
+    Object.defineProperty(navigator, 'onLine', {
+      configurable: true,
+      get: () => true,
+    })
     mounted?.unmount()
     mounted = null
     host?.remove()
@@ -759,15 +765,31 @@ describe('OrderPage', () => {
     await addExampleC001(el)
 
     sendButton(el).click()
-    await waitForText(el, 'falha temporária')
+    await waitForText(el, 'Pendente de envio')
     expect(el.querySelector('[data-testid="submit-error"]')?.textContent).toContain(
       'falha temporária',
+    )
+    expect(el.querySelector('[data-testid="submit-pending"]')?.textContent).toContain(
+      'Pendente de envio',
+    )
+    expect(el.querySelector('[data-testid="draft-locked"]')?.textContent).toContain(
+      DRAFT_LOCKED_MESSAGE,
     )
     expect(el.querySelector('[data-testid="order-result"]')).toBeNull()
     expect(el.querySelector('[data-testid="draft-saved"]')).not.toBeNull()
     const keyAfterFailure = persistedDraft('C001')?.idempotencyKey
     expect(keyAfterFailure).toMatch(UUID_RE)
     expect(persistedDraft('C001')?.lines).toHaveLength(3)
+    expect(persistedDraft('C001')?.submitPending).toBe(true)
+    expect(sendButton(el).textContent).toContain('Tentar de novo')
+
+    setField(cartLine(el, 'P001'), 'cart-units', '99')
+    await nextTick()
+    expect(persistedDraft('C001')?.lines[0]?.quantityUnits).toBe(10)
+    expect(
+      (cartLine(el, 'P001').querySelector('[data-testid="cart-units"]') as HTMLInputElement)
+        .disabled,
+    ).toBe(true)
 
     sendButton(el).click()
     await waitForText(el, 'Enviado')
@@ -791,6 +813,10 @@ describe('OrderPage', () => {
       { productId: 'P006', quantity: 40, discountPercent: 2 },
       { productId: 'P010', quantity: 24, discountPercent: 0 },
     ])
+    const secondBody = JSON.parse(
+      String((fetchMock.mock.calls[1] as [string, RequestInit])[1].body),
+    ) as { items: unknown }
+    expect(secondBody.items).toEqual(body.items)
   })
 
   it('impede o duplo clique enquanto o envio está em andamento', async () => {
@@ -845,8 +871,274 @@ describe('OrderPage', () => {
     expect(el.querySelector('[data-testid="order-result"]')).toBeNull()
     expect(el.querySelector('[data-testid="cart"]')).not.toBeNull()
     expect(el.querySelector('[data-testid="draft-saved"]')).not.toBeNull()
+    expect(el.querySelector('[data-testid="submit-pending"]')).toBeNull()
     expect(persistedDraft('C001')?.lines).toHaveLength(3)
     expect(persistedDraft('C001')?.idempotencyKey).toMatch(UUID_RE)
+    expect(persistedDraft('C001')?.submitPending).toBe(false)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(el.querySelector('[data-testid="draft-locked"]')).toBeNull()
+    expect(
+      (cartLine(el, 'P001').querySelector('[data-testid="cart-units"]') as HTMLInputElement)
+        .disabled,
+    ).toBe(false)
+
+    setField(cartLine(el, 'P001'), 'cart-units', '12')
+    await nextTick()
+    expect(persistedDraft('C001')?.lines[0]?.quantityUnits).toBe(12)
+    expect(persistedDraft('C001')?.idempotencyKey).toMatch(UUID_RE)
+
+    vi.useFakeTimers()
+    await vi.advanceTimersByTimeAsync(30_000)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('falha de rede entra em pendente e retenta com a mesma chave', async () => {
+    fetchSellerCustomers.mockResolvedValue(v01Wallet)
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(jsonResponse(201, createdOrder('Enviado')))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const el = await render('C001')
+    await waitForText(el, 'Mercadinho São José')
+    await addExampleC001(el)
+    const key = persistedDraft('C001')?.idempotencyKey
+
+    sendButton(el).click()
+    await waitForText(el, 'Pendente de envio')
+    expect(persistedDraft('C001')?.submitPending).toBe(true)
+    expect(persistedDraft('C001')?.idempotencyKey).toBe(key)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    sendButton(el).click()
+    await waitForText(el, 'Enviado')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    const firstKey = new Headers((fetchMock.mock.calls[0] as [string, RequestInit])[1].headers).get(
+      'Idempotency-Key',
+    )
+    const secondKey = new Headers(
+      (fetchMock.mock.calls[1] as [string, RequestInit])[1].headers,
+    ).get('Idempotency-Key')
+    expect(firstKey).toBe(key)
+    expect(secondKey).toBe(key)
+    expect(persistedDraft('C001')).toBeUndefined()
+  })
+
+  it('5xx retenta com backoff e a mesma Idempotency-Key', async () => {
+    fetchSellerCustomers.mockResolvedValue(v01Wallet)
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(500, { message: 'falha temporária' }))
+      .mockResolvedValueOnce(jsonResponse(201, createdOrder('Enviado')))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const el = await render('C001')
+    await waitForText(el, 'Mercadinho São José')
+    await addExampleC001(el)
+    const key = persistedDraft('C001')?.idempotencyKey
+
+    vi.useFakeTimers()
+    sendButton(el).click()
+    await vi.advanceTimersByTimeAsync(0)
+    await nextTick()
+
+    expect(el.querySelector('[data-testid="submit-pending"]')?.textContent).toContain(
+      'Pendente de envio',
+    )
+    expect(persistedDraft('C001')?.submitPending).toBe(true)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(999)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(1)
+    await nextTick()
+    vi.useRealTimers()
+    await waitForText(el, 'Enviado')
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    const firstKey = new Headers((fetchMock.mock.calls[0] as [string, RequestInit])[1].headers).get(
+      'Idempotency-Key',
+    )
+    const secondKey = new Headers(
+      (fetchMock.mock.calls[1] as [string, RequestInit])[1].headers,
+    ).get('Idempotency-Key')
+    expect(firstKey).toBe(key)
+    expect(secondKey).toBe(key)
+    expect(persistedDraft('C001')).toBeUndefined()
+  })
+
+  it('offline no Enviar mostra aguardando conexão e envia ao voltar online', async () => {
+    fetchSellerCustomers.mockResolvedValue(v01Wallet)
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(201, createdOrder('Enviado')))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const el = await render('C001')
+    await waitForText(el, 'Mercadinho São José')
+    await addExampleC001(el)
+    const key = persistedDraft('C001')?.idempotencyKey
+    expect(el.querySelector('[data-testid="connection-status"]')?.textContent).toContain('Online')
+
+    useOnlineStore().setOnline(false)
+    await nextTick()
+    expect(el.querySelector('[data-testid="connection-status"]')?.textContent).toContain(
+      'Sem conexão',
+    )
+
+    sendButton(el).click()
+    await waitForText(el, 'Aguardando conexão')
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(persistedDraft('C001')?.submitPending).toBe(true)
+    expect(persistedDraft('C001')?.idempotencyKey).toBe(key)
+    expect(el.querySelector('[data-testid="submit-pending"]')?.textContent).toContain(
+      'Aguardando conexão',
+    )
+    expect(el.querySelector('[data-testid="draft-locked"]')?.textContent).toContain(
+      DRAFT_LOCKED_MESSAGE,
+    )
+    expect(
+      (cartLine(el, 'P001').querySelector('[data-testid="cart-units"]') as HTMLInputElement)
+        .disabled,
+    ).toBe(true)
+    expect(
+      (cartLine(el, 'P006').querySelector('[data-testid="cart-lots"]') as HTMLInputElement)
+        .disabled,
+    ).toBe(true)
+    expect(
+      (cartLine(el, 'P001').querySelector('[data-testid="cart-discount"]') as HTMLInputElement)
+        .disabled,
+    ).toBe(true)
+    expect(
+      (cartLine(el, 'P001').querySelector('[data-testid="remove-line"]') as HTMLButtonElement)
+        .disabled,
+    ).toBe(true)
+    expect(sendButton(el).disabled).toBe(false)
+    expect(sendButton(el).textContent).toContain('Tentar de novo')
+
+    setField(cartLine(el, 'P001'), 'cart-units', '99')
+    setField(cartLine(el, 'P006'), 'cart-lots', '9')
+    setField(cartLine(el, 'P001'), 'cart-discount', '8')
+    cartLine(el, 'P010')
+      .querySelector('[data-testid="remove-line"]')
+      ?.dispatchEvent(new Event('click', { bubbles: true }))
+    await nextTick()
+    expect(persistedDraft('C001')?.lines.map((line) => line.quantityUnits)).toEqual([10, 40, 24])
+    expect(persistedDraft('C001')?.lines[1]?.discountPercent).toBe(2)
+    expect(persistedDraft('C001')?.lines).toHaveLength(3)
+    expect(persistedDraft('C001')?.idempotencyKey).toBe(key)
+
+    useOnlineStore().setOnline(true)
+    await waitForText(el, 'Enviado')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const headers = new Headers((fetchMock.mock.calls[0] as [string, RequestInit])[1].headers)
+    expect(headers.get('Idempotency-Key')).toBe(key)
+    const sent = JSON.parse(String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body)) as {
+      items: { productId: string; quantity: number; discountPercent: number }[]
+    }
+    expect(sent.items).toEqual([
+      { productId: 'P001', quantity: 10, discountPercent: 0 },
+      { productId: 'P006', quantity: 40, discountPercent: 2 },
+      { productId: 'P010', quantity: 24, discountPercent: 0 },
+    ])
+    expect(persistedDraft('C001')).toBeUndefined()
+  })
+
+  it('pendente desabilita Repetir e Adicionar sem mudar o rascunho', async () => {
+    fetchSellerCustomers.mockResolvedValue(v01Wallet)
+    fetchCustomerOrders.mockResolvedValue([
+      { id: 'PH001', date: '2026-09-15', status: 'Faturado', total: 58303 },
+    ])
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    const el = await render('C001')
+    await waitForText(el, 'Mercadinho São José')
+    await addExampleC001(el)
+    useOnlineStore().setOnline(false)
+    sendButton(el).click()
+    await waitForText(el, 'Aguardando conexão')
+
+    const repeat = el.querySelector('[data-testid="repeat-order"]') as HTMLButtonElement
+    expect(repeat.disabled).toBe(true)
+    repeat.click()
+    expect(repeatCustomerOrder).not.toHaveBeenCalled()
+    expect(el.querySelector('[data-testid="overwrite-confirm"]')).toBeNull()
+
+    fetchCustomerProducts.mockResolvedValue([p009])
+    await searchFor(el, 'Achocolatado em Pó 400g')
+    await waitForText(el, 'Achocolatado em Pó 400g')
+    const add = el.querySelector(
+      '[data-product-id="P009"] [data-testid="add-product"]',
+    ) as HTMLButtonElement
+    expect(add.disabled).toBe(true)
+    add.click()
+    await nextTick()
+    expect(el.querySelector('[data-testid="cart-line"][data-product-id="P009"]')).toBeNull()
+    expect(persistedDraft('C001')?.lines).toHaveLength(3)
+  })
+
+  it('recarregar com pendente mantém a chave e retoma o envio', async () => {
+    fetchSellerCustomers.mockResolvedValue(v01Wallet)
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    const first = await render('C001')
+    await waitForText(first, 'Mercadinho São José')
+    await addExampleC001(first)
+    const key = persistedDraft('C001')?.idempotencyKey
+    useOnlineStore().setOnline(false)
+    sendButton(first).click()
+    await waitForText(first, 'Aguardando conexão')
+    expect(persistedDraft('C001')?.submitPending).toBe(true)
+    expect(persistedDraft('C001')?.idempotencyKey).toBe(key)
+
+    mounted?.unmount()
+    mounted = null
+    host?.remove()
+    host = null
+
+    fetchMock.mockResolvedValue(jsonResponse(201, createdOrder('Enviado')))
+    const second = await render('C001')
+    await waitForText(second, 'Enviado')
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const headers = new Headers((fetchMock.mock.calls[0] as [string, RequestInit])[1].headers)
+    expect(headers.get('Idempotency-Key')).toBe(key)
+    expect(persistedDraft('C001')).toBeUndefined()
+    expect(second.textContent).not.toContain('P001')
+  })
+
+  it('não dispara envios duplicados com clique e auto-retry concorrentes', async () => {
+    fetchSellerCustomers.mockResolvedValue(v01Wallet)
+    let resolveFetch: ((value: unknown) => void) | undefined
+    const fetchMock = vi.fn().mockReturnValue(
+      new Promise((resolve) => {
+        resolveFetch = resolve
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const el = await render('C001')
+    await waitForText(el, 'Mercadinho São José')
+    await addExampleC001(el)
+
+    sendButton(el).click()
+    await nextTick()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    vi.useFakeTimers()
+    await vi.advanceTimersByTimeAsync(5000)
+    sendButton(el).click()
+    sendButton(el).click()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    vi.useRealTimers()
+
+    resolveFetch?.(jsonResponse(201, createdOrder('Enviado')))
+    await waitForText(el, 'Enviado')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(persistedDraft('C001')).toBeUndefined()
+    expect(el.querySelector('[data-testid="draft-saved"]')).toBeNull()
   })
 
   it('mostra o resultado Enviado e limpa o rascunho', async () => {

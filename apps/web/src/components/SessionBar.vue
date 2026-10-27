@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { useOnlineStore } from '@/stores/online'
 import { useSessionStore } from '@/stores/session'
 
 const session = useSessionStore()
+const connection = useOnlineStore()
 const router = useRouter()
 
 const label = computed(() => {
@@ -24,6 +26,13 @@ function changeUser(): void {
     <div class="min-w-0">
       <p class="font-display text-sm tracking-wide text-safety">Yandeh</p>
       <p class="truncate font-sans text-base">{{ label }}</p>
+      <p
+        data-testid="connection-status"
+        class="mt-0.5 font-sans text-sm"
+        :class="connection.online ? 'text-receipt/75' : 'text-safety'"
+      >
+        {{ connection.online ? 'Online' : 'Sem conexão' }}
+      </p>
     </div>
     <button
       type="button"

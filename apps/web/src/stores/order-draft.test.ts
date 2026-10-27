@@ -432,4 +432,91 @@ describe('order draft store', () => {
     expect(persistedDrafts().C001).toBeUndefined()
     expect(draft.ensureIdempotencyKey('C001')).not.toBe(first)
   })
+
+  it('marca pendente de envio no rascunho e restaura a mesma chave no reload', () => {
+    const draft = useOrderDraftStore()
+    draft.addProduct('C001', p001)
+    draft.setUnits('C001', 'P001', '10')
+    const key = draft.ensureIdempotencyKey('C001')
+    expect(draft.isSubmitPending('C001')).toBe(false)
+    expect(persistedDrafts().C001?.submitPending).toBe(false)
+
+    draft.markSubmitPending('C001')
+    expect(draft.isSubmitPending('C001')).toBe(true)
+    expect(persistedDrafts().C001?.submitPending).toBe(true)
+    expect(persistedDrafts().C001?.idempotencyKey).toBe(key)
+
+    setActivePinia(createPinia())
+    const restored = useOrderDraftStore()
+    expect(restored.isSubmitPending('C001')).toBe(true)
+    expect(restored.ensureIdempotencyKey('C001')).toBe(key)
+    expect(restored.linesOf('C001')[0]?.quantityUnits).toBe(10)
+    expect(persistedDrafts().C001?.submitPending).toBe(true)
+  })
+
+  it('pendente trava itens, desconto, remoção e repeat; a chave permanece', () => {
+    const draft = useOrderDraftStore()
+    draft.addProduct('C001', p001)
+    draft.setUnits('C001', 'P001', '10')
+    const key = draft.ensureIdempotencyKey('C001')
+    draft.markSubmitPending('C001')
+
+    draft.setUnits('C001', 'P001', '12')
+    draft.setDiscount('C001', 'P001', '6')
+    draft.addProduct('C001', p006)
+    draft.removeLine('C001', 'P001')
+    draft.loadRepeatDraft('C001', [{ product: p006, quantityUnits: 40, discountPercent: 0 }])
+
+    expect(draft.isSubmitPending('C001')).toBe(true)
+    expect(draft.ensureIdempotencyKey('C001')).toBe(key)
+    expect(draft.linesOf('C001')).toHaveLength(1)
+    expect(draft.linesOf('C001')[0]?.product.id).toBe('P001')
+    expect(draft.linesOf('C001')[0]?.quantityUnits).toBe(10)
+    expect(draft.linesOf('C001')[0]?.discountPercent).toBe(0)
+    expect(persistedDrafts().C001?.submitPending).toBe(true)
+    expect(persistedDrafts().C001?.idempotencyKey).toBe(key)
+    expect(persistedDrafts().C001?.lines[0]?.quantityUnits).toBe(10)
+  })
+
+  it('clearSubmitPending libera a edição e mantém a chave; clearDraft apaga o pendente', () => {
+    const draft = useOrderDraftStore()
+    draft.addProduct('C001', p001)
+    draft.setUnits('C001', 'P001', '10')
+    const key = draft.ensureIdempotencyKey('C001')
+    draft.markSubmitPending('C001')
+
+    draft.clearSubmitPending('C001')
+    expect(draft.isSubmitPending('C001')).toBe(false)
+    expect(persistedDrafts().C001?.submitPending).toBe(false)
+    expect(persistedDrafts().C001?.idempotencyKey).toBe(key)
+    expect(draft.linesOf('C001')).toHaveLength(1)
+
+    draft.setUnits('C001', 'P001', '12')
+    expect(draft.linesOf('C001')[0]?.quantityUnits).toBe(12)
+
+    draft.loadRepeatDraft('C001', [{ product: p006, quantityUnits: 40, discountPercent: 0 }])
+    expect(draft.ensureIdempotencyKey('C001')).not.toBe(key)
+    expect(draft.linesOf('C001')[0]?.product.id).toBe('P006')
+
+    draft.markSubmitPending('C001')
+    draft.clearDraft('C001')
+    expect(draft.isSubmitPending('C001')).toBe(false)
+    expect(persistedDrafts().C001).toBeUndefined()
+  })
+
+  it('rascunho antigo sem submitPending hidrata como não pendente', () => {
+    localStorage.setItem(
+      DRAFT_STORAGE_KEY,
+      JSON.stringify({
+        C001: {
+          idempotencyKey: '3d8f1c2a-4b5e-4f70-9c1d-2a3b4c5d6e7f',
+          lines: [{ product: p001, quantityUnits: 10, discountPercent: 0 }],
+        },
+      }),
+    )
+    const draft = useOrderDraftStore()
+    expect(draft.isSubmitPending('C001')).toBe(false)
+    expect(draft.hasDraft('C001')).toBe(true)
+    expect(draft.ensureIdempotencyKey('C001')).toBe('3d8f1c2a-4b5e-4f70-9c1d-2a3b4c5d6e7f')
+  })
 })

@@ -7,11 +7,13 @@ const props = defineProps<{
   customerId: string
   line: DraftLine
   notice?: string | null
+  locked?: boolean
 }>()
 const draft = useOrderDraftStore()
 const view = computed(() => draft.viewOf(props.line))
 const quantityErrorId = computed(() => `quantity-error-${props.line.product.id}`)
 const discountErrorId = computed(() => `discount-error-${props.line.product.id}`)
+const fieldsDisabled = computed(() => props.locked === true)
 
 function onUnits(event: Event): void {
   draft.setUnits(props.customerId, props.line.product.id, (event.target as HTMLInputElement).value)
@@ -57,14 +59,17 @@ function remove(): void {
         <span class="font-sans text-sm text-steel">Unidades</span>
         <input
           :value="view.unitsText"
-          :readonly="view.unitsReadOnly"
+          :readonly="view.unitsReadOnly || fieldsDisabled"
+          :disabled="fieldsDisabled"
           inputmode="numeric"
           autocomplete="off"
           data-testid="cart-units"
           :aria-invalid="view.quantityError ? true : undefined"
           :aria-describedby="view.quantityError ? quantityErrorId : undefined"
-          class="mt-1 min-h-12 w-full border-0 border-b-2 border-counter px-3 font-sans text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-safety"
-          :class="view.unitsReadOnly ? 'bg-floor text-steel' : 'bg-receipt text-counter'"
+          class="mt-1 min-h-12 w-full border-0 border-b-2 border-counter px-3 font-sans text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-safety disabled:border-steel"
+          :class="
+            view.unitsReadOnly || fieldsDisabled ? 'bg-floor text-steel' : 'bg-receipt text-counter'
+          "
           @input="onUnits"
         />
       </label>
@@ -73,12 +78,19 @@ function remove(): void {
         <span class="font-sans text-sm text-steel">Lote {{ view.lotLabel }}</span>
         <input
           :value="view.lotsText"
+          :readonly="fieldsDisabled"
+          :disabled="fieldsDisabled"
           inputmode="numeric"
           autocomplete="off"
           data-testid="cart-lots"
           :aria-invalid="view.quantityError ? true : undefined"
           :aria-describedby="view.quantityError ? quantityErrorId : undefined"
-          class="mt-1 min-h-12 w-full border-0 border-b-2 border-counter bg-receipt px-3 font-sans text-base text-counter focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-safety"
+          class="mt-1 min-h-12 w-full border-0 border-b-2 px-3 font-sans text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-safety disabled:border-steel"
+          :class="
+            fieldsDisabled
+              ? 'border-steel bg-floor text-steel'
+              : 'border-counter bg-receipt text-counter'
+          "
           @input="onLots"
         />
       </label>
@@ -105,12 +117,19 @@ function remove(): void {
       <span class="font-sans text-sm text-steel">Desconto %</span>
       <input
         :value="view.discountText"
+        :readonly="fieldsDisabled"
+        :disabled="fieldsDisabled"
         inputmode="decimal"
         autocomplete="off"
         data-testid="cart-discount"
         :aria-invalid="view.discountError ? true : undefined"
         :aria-describedby="view.discountError ? discountErrorId : undefined"
-        class="mt-1 min-h-12 w-full border-0 border-b-2 border-counter bg-receipt px-3 font-sans text-base text-counter focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-safety"
+        class="mt-1 min-h-12 w-full border-0 border-b-2 px-3 font-sans text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-safety disabled:border-steel"
+        :class="
+          fieldsDisabled
+            ? 'border-steel bg-floor text-steel'
+            : 'border-counter bg-receipt text-counter'
+        "
         @input="onDiscount"
       />
     </label>
@@ -131,7 +150,9 @@ function remove(): void {
       <button
         type="button"
         data-testid="remove-line"
-        class="min-h-12 border-b-2 border-produce px-1 font-sans text-base text-produce focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-safety"
+        :disabled="fieldsDisabled"
+        class="min-h-12 border-b-2 px-1 font-sans text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-safety disabled:border-steel disabled:text-steel"
+        :class="fieldsDisabled ? 'border-steel text-steel' : 'border-produce text-produce'"
         @click="remove"
       >
         Remover

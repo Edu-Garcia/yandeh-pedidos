@@ -36,9 +36,9 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | F4 — Telas (req. 1–5, 7)          | 5       | 5      |
 | F5 — Histórico e repetir (req. 8) | 2       | 2      |
 | F6 — Supervisor (fecha req. 5)    | 2       | 2      |
-| F7 — Offline parcial (req. 9)     | 2       | 1      |
+| F7 — Offline parcial (req. 9)     | 2       | 2      |
 | F8 — Entrega e docs               | 4       | 0      |
-| **Total**                         | **34**  | **29** |
+| **Total**                         | **34**  | **30** |
 | Opcionais                         | 3       | 0      |
 
 > Sem estimativas de tempo: com IA acelerando a implementação, elas não refletem dados reais. Prioridade: núcleo (F1–F4 + F8, req. 1–7) primeiro. Se o prazo apertar, corte na ordem: opcionais → F7 → F6 (T-25) → F5, e registre em README "o que ficou de fora".
@@ -363,13 +363,16 @@ Validação comum: `pnpm --filter @yandeh/web typecheck && pnpm --filter @yandeh
 - **Status:** feito
 - **Docs:** A47–A49; DECISIONS.md e seed.json intactos.
 
-### [ ] T-27 — Retentativa de envio com a mesma chave
+### [x] T-27 — Retentativa de envio com a mesma chave
 
 - **Depende de:** T-26, T-16
 - **Escopo:** falha de rede/5xx → estado "pendente de envio" + botão/auto-retry com backoff usando a mesma `Idempotency-Key`; 422 não retenta; indicador online/offline (`navigator.onLine`).
 - **Aceite:** DevTools offline → Enviar → "aguardando conexão"; voltar online → enviado uma única vez (`SELECT count(*) FROM pedidos WHERE idempotency_key = ...` = 1).
+- **Validação:** `pnpm --filter @yandeh/web test` (rede/5xx → pendente + mesma chave; backoff; voltar online envia; 422 não retenta; sucesso limpa uma vez; sem envios concorrentes).
 - **Validação manual:** Montar pedido C001, DevTools → Offline, clicar Enviar → UI "aguardando conexão" / pendente de envio. Voltar Online → envia uma vez com a mesma `Idempotency-Key`. `SELECT count(*) FROM pedidos WHERE idempotency_key = '<chave>'` → 1. 422 (ex.: abaixo do mínimo, `BELOW_MINIMUM`) não retenta. Evidência: screenshot offline + count SQL.
 - **Commit:** `feat(web): retentativa de envio idempotente`
+- **Status:** feito
+- **Docs:** A50–A54; DECISIONS.md e seed.json intactos.
 
 ## F8 — Entrega e documentação
 
