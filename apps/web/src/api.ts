@@ -68,9 +68,12 @@ export function apiErrorFromBody(status: number, detail: string): ApiError {
 
 export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers)
-  const sellerId = useSessionStore().sellerId
-  if (sellerId) {
-    headers.set('X-Seller-Id', sellerId)
+  const session = useSessionStore()
+  if (session.sellerId) {
+    headers.set('X-Seller-Id', session.sellerId)
+  }
+  if (session.supervisorId) {
+    headers.set('X-Supervisor-Id', session.supervisorId)
   }
 
   const response = await fetch(`${API_URL}${path}`, { ...init, headers })
@@ -186,4 +189,45 @@ export function repeatCustomerOrder(
 /** 403/404 da API: não revelar se o recurso existe (T-17). */
 export function isHiddenResourceError(error: unknown): boolean {
   return error instanceof ApiError && (error.status === 403 || error.status === 404)
+}
+
+/** Pedido pendente do supervisor (T-24 / A43). */
+export type SupervisorOrderStatus = 'Aguardando aprovação' | 'Aprovado' | 'Rejeitado'
+
+export interface SupervisorOrder {
+  id: string
+  /** Data civil `YYYY-MM-DD` (sem fuso). */
+  date: string
+  status: SupervisorOrderStatus
+  /** Líquido em centavos, com preço e desconto congelados. */
+  total: number
+  maxDiscount: number
+  customer: {
+    id: string
+    tradeName: string
+  }
+  seller: {
+    id: string
+    name: string
+    discountAuthorityPercent: number
+  }
+}
+
+export const SUPERVISOR_PENDING_STATUS = 'Aguardando aprovação' as const
+
+export function fetchPendingSupervisorOrders(): Promise<SupervisorOrder[]> {
+  const params = new URLSearchParams({ status: SUPERVISOR_PENDING_STATUS })
+  return apiRequest<SupervisorOrder[]>(`/supervisor/orders?${params}`)
+}
+
+export function approveSupervisorOrder(orderId: string): Promise<SupervisorOrder> {
+  return apiRequest<SupervisorOrder>(`/supervisor/orders/${orderId}/approve`, {
+    method: 'POST',
+  })
+}
+
+export function rejectSupervisorOrder(orderId: string): Promise<SupervisorOrder> {
+  return apiRequest<SupervisorOrder>(`/supervisor/orders/${orderId}/reject`, {
+    method: 'POST',
+  })
 }
