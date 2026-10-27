@@ -7,7 +7,7 @@ import { clientes, pedidos, pedidosItens } from './schema.js'
 export type CreditReader = Pick<Db, 'select'>
 
 export async function pendingNetsByCustomer(database: CreditReader, customerIds: string[]) {
-  const byCustomer = new Map<string, Array<{ status: string; net: number }>>()
+  const byCustomer = new Map<string, Array<{ id: string; status: string; net: number }>>()
   if (customerIds.length === 0) {
     return byCustomer
   }
@@ -60,9 +60,9 @@ export async function pendingNetsByCustomer(database: CreditReader, customerIds:
     }
   }
 
-  for (const order of linesByOrder.values()) {
+  for (const [orderId, order] of linesByOrder) {
     const list = byCustomer.get(order.customerId) ?? []
-    list.push({ status: order.status, net: orderTotals(order.lines).net })
+    list.push({ id: orderId, status: order.status, net: orderTotals(order.lines).net })
     byCustomer.set(order.customerId, list)
   }
 
@@ -88,9 +88,12 @@ export async function lockCustomerForUpdate(database: CreditReader, customerId: 
 export async function availableCreditForCustomer(
   database: CreditReader,
   customer: { id: string; creditLimit: number; creditUsed: number },
+  options?: { excludeOrderId?: string },
 ) {
   const pending = await pendingNetsByCustomer(database, [customer.id])
-  const reserved = reservedCredit(pending.get(customer.id) ?? [])
+  const reserved = reservedCredit(
+    (pending.get(customer.id) ?? []).filter((order) => order.id !== options?.excludeOrderId),
+  )
   return availableCredit(
     { creditLimit: customer.creditLimit, creditUsed: customer.creditUsed },
     reserved,

@@ -4,6 +4,7 @@ import type { Db } from './db/client.js'
 import { registerCustomerRoutes } from './routes/customers.js'
 import { registerIdentityRoutes } from './routes/identity.js'
 import { registerOrderRoutes, type OrderRouteDeps } from './routes/orders.js'
+import { registerSupervisorRoutes } from './routes/supervisor.js'
 
 export type AppDeps = OrderRouteDeps
 
@@ -15,7 +16,7 @@ export function buildApp(database: Db, deps: AppDeps = {}) {
   registerIdentityRoutes(app, database)
   registerCustomerRoutes(app, database)
   registerOrderRoutes(app, database, deps)
+  registerSupervisorRoutes(app, database)
 
-  // TODO (ver PRD.md §8): rotas de aprovações do supervisor.
   return app
 }

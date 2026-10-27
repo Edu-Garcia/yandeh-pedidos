@@ -35,10 +35,10 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | F3 — API (req. 1–5, 7)            | 8       | 8      |
 | F4 — Telas (req. 1–5, 7)          | 5       | 5      |
 | F5 — Histórico e repetir (req. 8) | 2       | 2      |
-| F6 — Supervisor (fecha req. 5)    | 2       | 0      |
+| F6 — Supervisor (fecha req. 5)    | 2       | 1      |
 | F7 — Offline parcial (req. 9)     | 2       | 0      |
 | F8 — Entrega e docs               | 4       | 0      |
-| **Total**                         | **34**  | **26** |
+| **Total**                         | **34**  | **27** |
 | Opcionais                         | 3       | 0      |
 
 > Sem estimativas de tempo: com IA acelerando a implementação, elas não refletem dados reais. Prioridade: núcleo (F1–F4 + F8, req. 1–7) primeiro. Se o prazo apertar, corte na ordem: opcionais → F7 → F6 (T-25) → F5, e registre em README "o que ficou de fora".
@@ -328,7 +328,7 @@ Validação comum: `pnpm --filter @yandeh/web typecheck && pnpm --filter @yandeh
 
 ## F6 — Supervisor (fecha o fluxo do req. 5)
 
-### [ ] T-24 — API: pendentes, aprovar e rejeitar
+### [x] T-24 — API: pendentes, aprovar e rejeitar
 
 - **Refs:** RN09, RN11; D10; A13; R5, R7.
 - **Depende de:** T-15
@@ -336,6 +336,7 @@ Validação comum: `pnpm --filter @yandeh/web typecheck && pnpm --filter @yandeh
 - **Aceite:** C002 pendente R$ 320 → rejeitar → disponível volta a R$ 350; aprovar → utilizado +32.000; aprovar 2× → 409.
 - **Validação manual:** `docker compose up`. Criar pedido C002 `Aguardando aprovação` com líquido 32000. `curl -sS -D- -H 'X-Supervisor-Id: S01' 'localhost:3333/supervisor/orders?status=Aguardando%20aprova%C3%A7%C3%A3o'` → 200 contém o pedido. `curl -sS -D- -X POST -H 'X-Supervisor-Id: S01' localhost:3333/supervisor/orders/<id>/reject` → disponível de C002 volta a 35000. Recriar e `POST .../approve` → `credito_utilizado` de C002 sobe 32000; o mesmo approve de novo → 409. Pedido já Enviado → 409. Evidência: status + `GET /sellers/V01/customers` no C002.
 - **Commit:** `feat(api): aprovação e rejeição de pedidos pelo supervisor`
+- **Status:** feito
 
 ### [ ] T-25 — Web: tela de Aprovações
 
