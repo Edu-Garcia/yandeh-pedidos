@@ -21,6 +21,7 @@ describe('session store', () => {
     const session = useSessionStore()
     expect(session.hasSession).toBe(false)
     expect(session.sellerId).toBeNull()
+    expect(session.supervisorId).toBeNull()
     expect(session.actor).toBeNull()
   })
 
@@ -31,6 +32,7 @@ describe('session store', () => {
     expect(session.hasSession).toBe(true)
     expect(session.role).toBe('seller')
     expect(session.sellerId).toBe('V01')
+    expect(session.supervisorId).toBeNull()
     expect(session.homeRouteName).toBe('clients')
     expect(localStorage.getItem(SESSION_STORAGE_KEY)).toContain('V01')
 
@@ -48,6 +50,7 @@ describe('session store', () => {
     expect(session.hasSession).toBe(true)
     expect(session.role).toBe('supervisor')
     expect(session.sellerId).toBeNull()
+    expect(session.supervisorId).toBe('S01')
     expect(session.homeRouteName).toBe('approvals')
     expect(session.actor).toEqual({ kind: 'supervisor', supervisor: marta })
 
@@ -55,6 +58,7 @@ describe('session store', () => {
     const restored = useSessionStore()
     expect(restored.actor).toEqual({ kind: 'supervisor', supervisor: marta })
     expect(restored.sellerId).toBeNull()
+    expect(restored.supervisorId).toBe('S01')
   })
 
   it('signOut limpa a persistência', () => {

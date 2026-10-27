@@ -3,11 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   ApiError,
   apiErrorFromBody,
+  approveSupervisorOrder,
   createOrder,
   fetchCustomerOrders,
   fetchCustomerProducts,
+  fetchPendingSupervisorOrders,
   fetchSellerCustomers,
   isHiddenResourceError,
+  rejectSupervisorOrder,
   repeatCustomerOrder,
 } from './api'
 import { useSessionStore } from './stores/session'
@@ -169,6 +172,65 @@ describe('repeatCustomerOrder', () => {
     expect(url).toBe('http://localhost:3333/customers/C001/orders/PH001/repeat')
     expect(init.method).toBe('POST')
     expect(new Headers(init.headers).get('X-Seller-Id')).toBe('V01')
+  })
+})
+
+const marta = { id: 'S01', name: 'Marta Fernandes' }
+
+describe('fetchPendingSupervisorOrders', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    setActivePinia(createPinia())
+    vi.unstubAllGlobals()
+  })
+
+  it('chama GET /supervisor/orders com status pendente e X-Supervisor-Id', async () => {
+    useSessionStore().signInSupervisor(marta)
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [],
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchPendingSupervisorOrders()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe(
+      'http://localhost:3333/supervisor/orders?status=Aguardando+aprova%C3%A7%C3%A3o',
+    )
+    expect(new Headers(init.headers).get('X-Supervisor-Id')).toBe('S01')
+    expect(new Headers(init.headers).get('X-Seller-Id')).toBeNull()
+  })
+})
+
+describe('approveSupervisorOrder e rejectSupervisorOrder', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    setActivePinia(createPinia())
+    vi.unstubAllGlobals()
+  })
+
+  it('POST approve e reject com X-Supervisor-Id da sessão', async () => {
+    useSessionStore().signInSupervisor(marta)
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 'ord-1' }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await approveSupervisorOrder('ord-1')
+    await rejectSupervisorOrder('ord-2')
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    const [approveUrl, approveInit] = fetchMock.mock.calls[0] as [string, RequestInit]
+    const [rejectUrl, rejectInit] = fetchMock.mock.calls[1] as [string, RequestInit]
+    expect(approveUrl).toBe('http://localhost:3333/supervisor/orders/ord-1/approve')
+    expect(approveInit.method).toBe('POST')
+    expect(new Headers(approveInit.headers).get('X-Supervisor-Id')).toBe('S01')
+    expect(rejectUrl).toBe('http://localhost:3333/supervisor/orders/ord-2/reject')
+    expect(rejectInit.method).toBe('POST')
+    expect(new Headers(rejectInit.headers).get('X-Supervisor-Id')).toBe('S01')
   })
 })
 

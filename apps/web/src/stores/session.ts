@@ -28,6 +28,9 @@ export const useSessionStore = defineStore('session', () => {
   const hasSession = computed(() => actor.value !== null)
   const role = computed(() => actor.value?.kind ?? null)
   const sellerId = computed(() => (actor.value?.kind === 'seller' ? actor.value.seller.id : null))
+  const supervisorId = computed(() =>
+    actor.value?.kind === 'supervisor' ? actor.value.supervisor.id : null,
+  )
   const homeRouteName = computed(() => (role.value === 'supervisor' ? 'approvals' : 'clients'))
 
   function signInSeller(seller: Seller): void {
@@ -50,6 +53,7 @@ export const useSessionStore = defineStore('session', () => {
     hasSession,
     role,
     sellerId,
+    supervisorId,
     homeRouteName,
     signInSeller,
     signInSupervisor,

@@ -35,10 +35,10 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | F3 — API (req. 1–5, 7)            | 8       | 8      |
 | F4 — Telas (req. 1–5, 7)          | 5       | 5      |
 | F5 — Histórico e repetir (req. 8) | 2       | 2      |
-| F6 — Supervisor (fecha req. 5)    | 2       | 1      |
+| F6 — Supervisor (fecha req. 5)    | 2       | 2      |
 | F7 — Offline parcial (req. 9)     | 2       | 0      |
 | F8 — Entrega e docs               | 4       | 0      |
-| **Total**                         | **34**  | **27** |
+| **Total**                         | **34**  | **28** |
 | Opcionais                         | 3       | 0      |
 
 > Sem estimativas de tempo: com IA acelerando a implementação, elas não refletem dados reais. Prioridade: núcleo (F1–F4 + F8, req. 1–7) primeiro. Se o prazo apertar, corte na ordem: opcionais → F7 → F6 (T-25) → F5, e registre em README "o que ficou de fora".
@@ -338,12 +338,15 @@ Validação comum: `pnpm --filter @yandeh/web typecheck && pnpm --filter @yandeh
 - **Commit:** `feat(api): aprovação e rejeição de pedidos pelo supervisor`
 - **Status:** feito
 
-### [ ] T-25 — Web: tela de Aprovações
+### [x] T-25 — Web: tela de Aprovações
 
 - **Depende de:** T-24, T-17
 - **Aceite:** lista pendentes com vendedor, cliente, maior desconto vs alçada, total; Aprovar/Rejeitar atualiza a lista e mostra erro de crédito se a revalidação falhar.
+- **Validação:** `pnpm --filter @yandeh/web typecheck && pnpm --filter @yandeh/web build`; `pnpm --filter @yandeh/web test` (lista, aprovar/rejeitar, 422 de crédito e 404 do vendedor na rota).
 - **Validação manual:** Logar S01 → Aprovações lista pendentes com vendedor, cliente, maior desconto vs alçada e total. Aprovar um item some da lista; rejeitar outro some e libera crédito (conferir carteira do vendedor, ex.: C002 de V01). Se a revalidação de crédito falhar, a UI mostra o erro. Evidência: screenshots da lista e do estado após aprovar/rejeitar.
 - **Commit:** `feat(web): tela de aprovações do supervisor`
+- **Status:** feito
+- **Docs:** A44–A46; DECISIONS.md e seed.json intactos.
 
 ## F7 — Offline parcial (req. 9, V1)
 
