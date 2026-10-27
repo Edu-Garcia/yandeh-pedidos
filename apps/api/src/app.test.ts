@@ -9,7 +9,7 @@ import { eq, inArray, notInArray } from 'drizzle-orm'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { buildApp } from './app.js'
 import { db, pool } from './db/client.js'
-import { clientes, pedidos, pedidosItens, produtos } from './db/schema.js'
+import { clientes, pedidos, pedidosItens, produtos, supervisores } from './db/schema.js'
 
 const SEED_ORDER_IDS = ['PH001', 'PH002', 'PH003', 'PH004']
 
@@ -1177,6 +1177,431 @@ describe('POST /customers/:id/orders/:orderId/repeat', () => {
     })
     expect(res.statusCode).toBe(400)
     expect(res.json()).toEqual({ message: 'Cabeçalho X-Seller-Id é obrigatório' })
+    await app.close()
+  })
+})
+
+const pendingOrdersUrl = `/supervisor/orders?status=${encodeURIComponent('Aguardando aprovação')}`
+
+/** 404 genérico do Fastify para rota inexistente (não vaza o recurso). */
+function fastifyRouteNotFound(method: string, url: string) {
+  return {
+    message: `Route ${method}:${url} not found`,
+    error: 'Not Found',
+    statusCode: 404,
+  }
+}
+
+const pendingC002Items = [
+  { productId: 'P001', quantity: 11, discountPercent: 6 },
+  { productId: 'P008', quantity: 13, discountPercent: 0 },
+]
+
+async function createPendingC002(app: ReturnType<typeof buildApp>) {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/orders',
+    headers: {
+      'x-seller-id': 'V01',
+      'content-type': 'application/json',
+      'idempotency-key': randomUUID(),
+    },
+    payload: { customerId: 'C002', items: pendingC002Items },
+  })
+  expect(res.statusCode).toBe(201)
+  const body = res.json() as { id: string; status: string; totals: { net: number } }
+  expect(body.status).toBe('Aguardando aprovação')
+  expect(body.totals.net).toBe(32000)
+  return body
+}
+
+async function availableCreditOf(app: ReturnType<typeof buildApp>, customerId: string) {
+  const wallet = await app.inject({ method: 'GET', url: '/sellers/V01/customers' })
+  expect(wallet.statusCode).toBe(200)
+  const customers = wallet.json() as Array<{ id: string; availableCredit: number }>
+  return customers.find((customer) => customer.id === customerId)?.availableCredit
+}
+
+describe('GET /supervisor/orders', () => {
+  beforeEach(resetOrdersAndCredit)
+  afterEach(resetOrdersAndCredit)
+
+  it('lista o pendente de C002 com cliente, vendedor, data, total e maior desconto', async () => {
+    const app = buildApp(db)
+    const created = await createPendingC002(app)
+
+    const res = await app.inject({
+      method: 'GET',
+      url: pendingOrdersUrl,
+      headers: { 'x-supervisor-id': 'S01' },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual([
+      {
+        id: created.id,
+        date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        status: 'Aguardando aprovação',
+        total: 32000,
+        maxDiscount: 6,
+        customer: { id: 'C002', tradeName: 'Minibox Bom Preço' },
+        seller: { id: 'V01', name: 'Carlos Menezes', discountAuthorityPercent: 5 },
+      },
+    ])
+    await app.close()
+  })
+
+  it('não lista pedido Enviado', async () => {
+    const app = buildApp(db)
+    const sent = await app.inject({
+      method: 'POST',
+      url: '/orders',
+      headers: {
+        'x-seller-id': 'V01',
+        'content-type': 'application/json',
+        'idempotency-key': randomUUID(),
+      },
+      payload: { customerId: 'C001', items: exampleC001Items },
+    })
+    expect(sent.statusCode).toBe(201)
+
+    const res = await app.inject({
+      method: 'GET',
+      url: pendingOrdersUrl,
+      headers: { 'x-supervisor-id': 'S01' },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual([])
+    await app.close()
+  })
+
+  it('supervisor inexistente retorna o mesmo 404 de rota inexistente', async () => {
+    const app = buildApp(db)
+    const missingRoute = await app.inject({ method: 'GET', url: '/rota-inexistente' })
+    const res = await app.inject({
+      method: 'GET',
+      url: pendingOrdersUrl,
+      headers: { 'x-supervisor-id': 'S99' },
+    })
+    expect(missingRoute.statusCode).toBe(404)
+    expect(res.statusCode).toBe(404)
+    expect(res.json()).toEqual(fastifyRouteNotFound('GET', pendingOrdersUrl))
+    expect(res.json()).toEqual({
+      ...missingRoute.json(),
+      message: fastifyRouteNotFound('GET', pendingOrdersUrl).message,
+    })
+    expect(res.json()).not.toEqual(
+      expect.objectContaining({ message: 'Supervisor não encontrado' }),
+    )
+    await app.close()
+  })
+
+  it('sem X-Supervisor-Id retorna o mesmo 404 de rota inexistente', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({ method: 'GET', url: pendingOrdersUrl })
+    expect(res.statusCode).toBe(404)
+    expect(res.json()).toEqual(fastifyRouteNotFound('GET', pendingOrdersUrl))
+    await app.close()
+  })
+
+  it('X-Supervisor-Id vazio retorna o mesmo 404 de rota inexistente', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({
+      method: 'GET',
+      url: pendingOrdersUrl,
+      headers: { 'x-supervisor-id': '   ' },
+    })
+    expect(res.statusCode).toBe(404)
+    expect(res.json()).toEqual(fastifyRouteNotFound('GET', pendingOrdersUrl))
+    await app.close()
+  })
+
+  it('supervisor inexistente com status ausente também retorna 404, não 400', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({
+      method: 'GET',
+      url: '/supervisor/orders',
+      headers: { 'x-supervisor-id': 'S99' },
+    })
+    expect(res.statusCode).toBe(404)
+    expect(res.json()).toEqual(fastifyRouteNotFound('GET', '/supervisor/orders'))
+    await app.close()
+  })
+
+  it('status ausente ou diferente de Aguardando aprovação retorna 400', async () => {
+    const app = buildApp(db)
+    const missing = await app.inject({
+      method: 'GET',
+      url: '/supervisor/orders',
+      headers: { 'x-supervisor-id': 'S01' },
+    })
+    expect(missing.statusCode).toBe(400)
+    expect(missing.json()).toEqual({
+      message: 'Parâmetro status deve ser Aguardando aprovação',
+    })
+
+    const other = await app.inject({
+      method: 'GET',
+      url: '/supervisor/orders?status=Enviado',
+      headers: { 'x-supervisor-id': 'S01' },
+    })
+    expect(other.statusCode).toBe(400)
+    expect(other.json()).toEqual({
+      message: 'Parâmetro status deve ser Aguardando aprovação',
+    })
+    await app.close()
+  })
+})
+
+describe('POST /supervisor/orders/:id/approve e /reject', () => {
+  beforeEach(resetOrdersAndCredit)
+  afterEach(async () => {
+    await db.delete(supervisores).where(eq(supervisores.id, 'S99'))
+    await resetOrdersAndCredit()
+  })
+
+  it('rejeitar C002 de 32000 libera a reserva e o disponível volta a 35000', async () => {
+    const app = buildApp(db)
+    const created = await createPendingC002(app)
+    expect(await availableCreditOf(app, 'C002')).toBe(3000)
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/supervisor/orders/${created.id}/reject`,
+      headers: { 'x-supervisor-id': 'S01' },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toMatchObject({
+      id: created.id,
+      status: 'Rejeitado',
+      total: 32000,
+      maxDiscount: 6,
+      customer: { id: 'C002', tradeName: 'Minibox Bom Preço' },
+      seller: { id: 'V01', name: 'Carlos Menezes', discountAuthorityPercent: 5 },
+    })
+    expect(await availableCreditOf(app, 'C002')).toBe(35000)
+
+    const [c002] = await db
+      .select({ creditUsed: clientes.creditoUtilizadoCentavos })
+      .from(clientes)
+      .where(eq(clientes.id, 'C002'))
+    expect(c002?.creditUsed).toBe(SEED_CREDIT_USED.C002)
+
+    const list = await app.inject({
+      method: 'GET',
+      url: pendingOrdersUrl,
+      headers: { 'x-supervisor-id': 'S01' },
+    })
+    expect(list.json()).toEqual([])
+    await app.close()
+  })
+
+  it('aprovar C002 de 32000 soma 32000 no utilizado', async () => {
+    const app = buildApp(db)
+    const created = await createPendingC002(app)
+    expect(await availableCreditOf(app, 'C002')).toBe(3000)
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/supervisor/orders/${created.id}/approve`,
+      headers: { 'x-supervisor-id': 'S01' },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toMatchObject({
+      id: created.id,
+      status: 'Aprovado',
+      total: 32000,
+      customer: { id: 'C002', tradeName: 'Minibox Bom Preço' },
+      seller: { id: 'V01', name: 'Carlos Menezes', discountAuthorityPercent: 5 },
+    })
+
+    const [c002] = await db
+      .select({ creditUsed: clientes.creditoUtilizadoCentavos })
+      .from(clientes)
+      .where(eq(clientes.id, 'C002'))
+    expect(c002?.creditUsed).toBe(SEED_CREDIT_USED.C002 + 32000)
+    expect(await availableCreditOf(app, 'C002')).toBe(3000)
+    await app.close()
+  })
+
+  it('aprovar duas vezes retorna 409', async () => {
+    const app = buildApp(db)
+    const created = await createPendingC002(app)
+
+    const first = await app.inject({
+      method: 'POST',
+      url: `/supervisor/orders/${created.id}/approve`,
+      headers: { 'x-supervisor-id': 'S01' },
+    })
+    expect(first.statusCode).toBe(200)
+
+    const second = await app.inject({
+      method: 'POST',
+      url: `/supervisor/orders/${created.id}/approve`,
+      headers: { 'x-supervisor-id': 'S01' },
+    })
+    expect(second.statusCode).toBe(409)
+    expect(second.json()).toEqual({ message: 'Pedido não está aguardando aprovação' })
+
+    const [c002] = await db
+      .select({ creditUsed: clientes.creditoUtilizadoCentavos })
+      .from(clientes)
+      .where(eq(clientes.id, 'C002'))
+    expect(c002?.creditUsed).toBe(SEED_CREDIT_USED.C002 + 32000)
+    await app.close()
+  })
+
+  it('pedido já Enviado retorna 409', async () => {
+    const app = buildApp(db)
+    const sent = await app.inject({
+      method: 'POST',
+      url: '/orders',
+      headers: {
+        'x-seller-id': 'V01',
+        'content-type': 'application/json',
+        'idempotency-key': randomUUID(),
+      },
+      payload: { customerId: 'C001', items: exampleC001Items },
+    })
+    expect(sent.statusCode).toBe(201)
+    const { id } = sent.json() as { id: string }
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/supervisor/orders/${id}/approve`,
+      headers: { 'x-supervisor-id': 'S01' },
+    })
+    expect(res.statusCode).toBe(409)
+    expect(res.json()).toEqual({ message: 'Pedido não está aguardando aprovação' })
+    await app.close()
+  })
+
+  it('sem X-Supervisor-Id retorna o mesmo 404 de rota inexistente', async () => {
+    const app = buildApp(db)
+    const created = await createPendingC002(app)
+    const url = `/supervisor/orders/${created.id}/approve`
+    const res = await app.inject({ method: 'POST', url })
+    expect(res.statusCode).toBe(404)
+    expect(res.json()).toEqual(fastifyRouteNotFound('POST', url))
+    await app.close()
+  })
+
+  it('supervisor inexistente retorna o mesmo 404 de rota inexistente', async () => {
+    const app = buildApp(db)
+    const created = await createPendingC002(app)
+    const url = `/supervisor/orders/${created.id}/approve`
+    const res = await app.inject({
+      method: 'POST',
+      url,
+      headers: { 'x-supervisor-id': 'S99' },
+    })
+    expect(res.statusCode).toBe(404)
+    expect(res.json()).toEqual(fastifyRouteNotFound('POST', url))
+    expect(res.json()).not.toEqual(expect.objectContaining({ message: 'Pedido não encontrado' }))
+
+    const [order] = await db
+      .select({ status: pedidos.status })
+      .from(pedidos)
+      .where(eq(pedidos.id, created.id))
+    expect(order?.status).toBe('Aguardando aprovação')
+    await app.close()
+  })
+
+  it('supervisor de outro time retorna 404 sem vazar o pedido', async () => {
+    await db.insert(supervisores).values({ id: 'S99', nome: 'Outro Supervisor' })
+    const app = buildApp(db)
+    const created = await createPendingC002(app)
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/supervisor/orders/${created.id}/reject`,
+      headers: { 'x-supervisor-id': 'S99' },
+    })
+    expect(res.statusCode).toBe(404)
+    expect(res.json()).toEqual({ message: 'Pedido não encontrado' })
+    await app.close()
+  })
+
+  it('pedido inexistente retorna 404', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({
+      method: 'POST',
+      url: '/supervisor/orders/PH999/approve',
+      headers: { 'x-supervisor-id': 'S01' },
+    })
+    expect(res.statusCode).toBe(404)
+    expect(res.json()).toEqual({ message: 'Pedido não encontrado' })
+    await app.close()
+  })
+
+  it('crédito insuficiente na aprovação retorna 422 e mantém o pendente', async () => {
+    const app = buildApp(db)
+    const created = await createPendingC002(app)
+
+    await db
+      .update(clientes)
+      .set({ creditoUtilizadoCentavos: SEED_CREDIT_USED.C002 + 4000 })
+      .where(eq(clientes.id, 'C002'))
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/supervisor/orders/${created.id}/approve`,
+      headers: { 'x-supervisor-id': 'S01' },
+    })
+
+    expect(res.statusCode).toBe(422)
+    expect(res.json()).toEqual([
+      {
+        code: 'INSUFFICIENT_CREDIT',
+        message: 'Total líquido acima do crédito disponível',
+        available: 31000,
+        net: 32000,
+      },
+    ])
+
+    const [order] = await db
+      .select({ status: pedidos.status })
+      .from(pedidos)
+      .where(eq(pedidos.id, created.id))
+    expect(order?.status).toBe('Aguardando aprovação')
+    const [c002] = await db
+      .select({ creditUsed: clientes.creditoUtilizadoCentavos })
+      .from(clientes)
+      .where(eq(clientes.id, 'C002'))
+    expect(c002?.creditUsed).toBe(SEED_CREDIT_USED.C002 + 4000)
+    await app.close()
+  })
+
+  it('dois approves concorrentes do mesmo pedido: um 200 e o outro 409', async () => {
+    const app = buildApp(db)
+    const created = await createPendingC002(app)
+    const headers = { 'x-supervisor-id': 'S01' }
+    const url = `/supervisor/orders/${created.id}/approve`
+
+    const [first, second] = await Promise.all([
+      app.inject({ method: 'POST', url, headers }),
+      app.inject({ method: 'POST', url, headers }),
+    ])
+
+    const statuses = [first.statusCode, second.statusCode].sort()
+    expect(statuses).toEqual([200, 409])
+
+    const failed = first.statusCode === 409 ? first : second
+    expect(failed.json()).toEqual({ message: 'Pedido não está aguardando aprovação' })
+
+    const [c002] = await db
+      .select({ creditUsed: clientes.creditoUtilizadoCentavos })
+      .from(clientes)
+      .where(eq(clientes.id, 'C002'))
+    expect(c002?.creditUsed).toBe(SEED_CREDIT_USED.C002 + 32000)
+
+    const [order] = await db
+      .select({ status: pedidos.status })
+      .from(pedidos)
+      .where(eq(pedidos.id, created.id))
+    expect(order?.status).toBe('Aprovado')
     await app.close()
   })
 })

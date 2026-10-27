@@ -54,6 +54,14 @@ export const productsCatalogSchema = z.array(productSchema)
 
 export const sellerIdHeaderSchema = z.string().trim().min(1)
 
+export const supervisorIdHeaderSchema = z.string().trim().min(1)
+
+export const PENDING_APPROVAL_STATUS = 'Aguardando aprovação' as const
+
+export const supervisorOrdersQuerySchema = z.object({
+  status: z.literal(PENDING_APPROVAL_STATUS),
+})
+
 export const idempotencyKeyHeaderSchema = z.uuid()
 
 export const customerProductsQuerySchema = z.object({
@@ -207,3 +215,24 @@ export const repeatDraftResponseSchema = z.object({
   removed: z.array(repeatRemovedItemSchema),
   notices: z.array(repeatNoticeSchema),
 })
+
+/** Pendente/decisão do supervisor: nomes legíveis para a UI (PRD §7.5, T-24). */
+export const supervisorOrderSchema = z.object({
+  id: z.string(),
+  date: z.string(),
+  status: z.enum(['Aguardando aprovação', 'Aprovado', 'Rejeitado']),
+  /** Líquido em centavos, com preço e desconto congelados do pedido. */
+  total: z.number(),
+  maxDiscount: z.number(),
+  customer: z.object({
+    id: z.string(),
+    tradeName: z.string(),
+  }),
+  seller: z.object({
+    id: z.string(),
+    name: z.string(),
+    discountAuthorityPercent: z.number(),
+  }),
+})
+
+export const supervisorOrdersResponseSchema = z.array(supervisorOrderSchema)
