@@ -4,10 +4,12 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   DISCOUNT_ERROR,
+  DRAFT_STORAGE_KEY,
   QUANTITY_ERROR,
   buildLineView,
   defaultUnits,
   useOrderDraftStore,
+  type PersistedOrderDraft,
 } from './order-draft'
 
 const p001: CustomerProduct = {
@@ -47,6 +49,13 @@ const p006: CustomerProduct = {
   packFactor: 20,
   multipleOnly: true,
   unitPrice: 333,
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function persistedDrafts(): Record<string, PersistedOrderDraft> {
+  const raw = localStorage.getItem(DRAFT_STORAGE_KEY)
+  return raw ? (JSON.parse(raw) as Record<string, PersistedOrderDraft>) : {}
 }
 
 const p010: CustomerProduct = {
@@ -90,10 +99,94 @@ describe('order draft store', () => {
     expect(draft.linesOf('C001')[0]?.quantityUnits).toBe(40)
   })
 
-  it('não persiste o rascunho (T-26)', () => {
+  it('persiste itens e chave no localStorage ao montar o rascunho', () => {
     const draft = useOrderDraftStore()
     draft.addProduct('C001', p006)
-    expect(localStorage.length).toBe(0)
+    draft.setLots('C001', 'P006', '2')
+
+    const stored = persistedDrafts().C001
+    expect(stored).toBeDefined()
+    expect(stored?.idempotencyKey).toMatch(UUID_RE)
+    expect(stored?.lines).toHaveLength(1)
+    expect(stored?.lines[0]?.product.id).toBe('P006')
+    expect(stored?.lines[0]?.quantityUnits).toBe(40)
+    expect(draft.ensureIdempotencyKey('C001')).toBe(stored?.idempotencyKey)
+  })
+
+  it('restaura itens e a mesma chave depois de um reload', () => {
+    const draft = useOrderDraftStore()
+    draft.addProduct('C001', p001)
+    draft.setUnits('C001', 'P001', '10')
+    const key = draft.ensureIdempotencyKey('C001')
+
+    setActivePinia(createPinia())
+    const restored = useOrderDraftStore()
+    expect(restored.hasDraft('C001')).toBe(true)
+    expect(restored.linesOf('C001')).toHaveLength(1)
+    expect(restored.linesOf('C001')[0]?.product.id).toBe('P001')
+    expect(restored.linesOf('C001')[0]?.quantityUnits).toBe(10)
+    expect(restored.linesOf('C001')[0]?.product.unitPrice).toBe(2690)
+    expect(restored.ensureIdempotencyKey('C001')).toBe(key)
+    expect(persistedDrafts().C001?.idempotencyKey).toBe(key)
+  })
+
+  it('isola o rascunho persistido por cliente', () => {
+    const draft = useOrderDraftStore()
+    draft.addProduct('C001', p001)
+    draft.setUnits('C001', 'P001', '10')
+    draft.addProduct('C002', p004)
+    const keyC001 = draft.ensureIdempotencyKey('C001')
+    const keyC002 = draft.ensureIdempotencyKey('C002')
+    expect(keyC002).not.toBe(keyC001)
+
+    setActivePinia(createPinia())
+    const restored = useOrderDraftStore()
+    expect(restored.linesOf('C001')[0]?.product.id).toBe('P001')
+    expect(restored.linesOf('C001')[0]?.quantityUnits).toBe(10)
+    expect(restored.linesOf('C002')[0]?.product.id).toBe('P004')
+    expect(restored.linesOf('C003')).toEqual([])
+    expect(restored.ensureIdempotencyKey('C001')).toBe(keyC001)
+    expect(restored.ensureIdempotencyKey('C002')).toBe(keyC002)
+    expect(persistedDrafts().C003).toBeUndefined()
+  })
+
+  it('limpa o rascunho persistido após envio confirmado e preserva os outros clientes', () => {
+    const draft = useOrderDraftStore()
+    draft.addProduct('C001', p001)
+    draft.addProduct('C002', p004)
+    const keyC002 = draft.ensureIdempotencyKey('C002')
+
+    draft.clearDraft('C001')
+    expect(draft.hasDraft('C001')).toBe(false)
+    expect(persistedDrafts().C001).toBeUndefined()
+    expect(persistedDrafts().C002?.idempotencyKey).toBe(keyC002)
+    expect(draft.linesOf('C002')).toHaveLength(1)
+
+    draft.clearDraft('C002')
+    expect(localStorage.getItem(DRAFT_STORAGE_KEY)).toBeNull()
+  })
+
+  it('não limpa o rascunho persistido quando o envio falha', () => {
+    const draft = useOrderDraftStore()
+    draft.addProduct('C001', p001)
+    draft.setUnits('C001', 'P001', '10')
+    const key = draft.ensureIdempotencyKey('C001')
+
+    expect(persistedDrafts().C001?.idempotencyKey).toBe(key)
+    expect(draft.linesOf('C001')[0]?.quantityUnits).toBe(10)
+    expect(draft.hasDraft('C001')).toBe(true)
+  })
+
+  it('remove a persistência quando o último item sai do rascunho', () => {
+    const draft = useOrderDraftStore()
+    draft.addProduct('C001', p001)
+    const key = draft.ensureIdempotencyKey('C001')
+    expect(persistedDrafts().C001).toBeDefined()
+
+    draft.removeLine('C001', 'P001')
+    expect(draft.hasDraft('C001')).toBe(false)
+    expect(localStorage.getItem(DRAFT_STORAGE_KEY)).toBeNull()
+    expect(draft.ensureIdempotencyKey('C001')).not.toBe(key)
   })
 
   it('P006 (FD 20, só múltiplo): Lote 2 FD → 40 un e Unidades somente leitura', () => {
@@ -306,7 +399,9 @@ describe('order draft store', () => {
     expect(draft.linesOf('C001')[0]?.discountPercent).toBe(0)
     expect(draft.linesOf('C001')[1]?.product.unitPrice).toBe(2690)
     expect(draft.ensureIdempotencyKey('C001')).not.toBe(key)
-    expect(localStorage.length).toBe(0)
+    expect(persistedDrafts().C001?.idempotencyKey).toBe(draft.ensureIdempotencyKey('C001'))
+    expect(persistedDrafts().C001?.lines).toHaveLength(2)
+    expect(persistedDrafts().C001?.lines[0]?.product.id).toBe('P006')
   })
 
   it('hasDraft é falso sem linhas; clearDraft esvazia', () => {
@@ -329,10 +424,12 @@ describe('order draft store', () => {
     )
     expect(second).toBe(first)
     expect(draft.ensureIdempotencyKey('C002')).not.toBe(first)
-    expect(localStorage.length).toBe(0)
+    expect(persistedDrafts().C001?.idempotencyKey).toBe(first)
+    expect(persistedDrafts().C002).toBeUndefined()
 
     draft.clearDraft('C001')
     expect(draft.linesOf('C001')).toEqual([])
+    expect(persistedDrafts().C001).toBeUndefined()
     expect(draft.ensureIdempotencyKey('C001')).not.toBe(first)
   })
 })
