@@ -3,7 +3,9 @@
 Módulo de montagem de pedidos para vendedores externos. Requisitos e regras: [`PRD.md`](PRD.md).
 Decisões: [`DECISIONS.md`](DECISIONS.md) · Assunções: [`ASSUMPTIONS.md`](ASSUMPTIONS.md) · Uso de IA: [`AI_LOG.md`](AI_LOG.md) · Plano de tarefas: [`TASKS.md`](TASKS.md).
 
-> **Status:** scaffold inicial (estrutura, Docker, banco e seed). Regras de negócio e telas ainda são stubs.
+> **Status:** F0–F7 e T-28 (README final) concluídas (req. 1–8 e V1 do req. 9: rascunho local + reenvio idempotente). Faltam T-29 (`DECISIONS.md`, campos "com mais tempo"), T-30 (`AI_LOG.md`) e T-31 (verificação a partir de clone limpo). Opcionais T-32–T-34 não feitos.
+>
+> O desafio foi entregue ao recrutador em 26/10/2026 com o repositório incompleto. O estado no prazo é o commit [`af003cc`](https://github.com/Edu-Garcia/yandeh-pedidos/tree/af003cc9b2f8b06639fb757cd27388568e8a2c51) (merge do PR #25, T-22): no `TASKS.md` daquele commit, T-00–T-22 estavam `[x]` (F0–F4 e a API de histórico/repetir; 25 de 34). Depois do prazo: tela de histórico (T-23), supervisor (T-24/T-25) e offline parcial V1 (T-26/T-27).
 
 ## Stack
 
@@ -24,7 +26,7 @@ docker compose up --build
 ```
 
 - Web: http://localhost:5173
-- API: http://localhost:3333/health
+- API: http://localhost:3333 — `GET /health` → `{"status":"ok"}`
 - Postgres: localhost:5432 (`yandeh`/`yandeh`)
 
 A API roda migrações e seed a cada start (idempotente: `ON CONFLICT DO NOTHING`). Para zerar o banco: `docker compose down -v`.
@@ -42,33 +44,104 @@ pnpm --filter @yandeh/shared build
 pnpm dev                              # api (3333) + web (5173)
 ```
 
-Variáveis da API (ver `.env.example` e `docker-compose.yml`): `DATABASE_URL`, `API_PORT`, `HOST`, `BUSINESS_TIMEZONE` (fuso da data civil do pedido; default `America/Fortaleza`).
+`@yandeh/shared` exporta `dist/`: o build acima é obrigatório antes de `pnpm dev` e de typecheck/testes da API e da web.
+
+Variáveis da API (ver `.env.example`, `apps/api/src/env.ts` e `docker-compose.yml`): `DATABASE_URL`, `API_PORT`, `HOST` (default `0.0.0.0`; não está no `.env.example`), `BUSINESS_TIMEZONE` (fuso da data civil do pedido; default `America/Fortaleza`).
+
+### Usuários de teste (login simulado)
+
+Sem senha. Na tela "Quem é você?" a API lista o seed:
+
+| Papel      | Id  | Nome            | Alçada | Carteira / tela            |
+| ---------- | --- | --------------- | ------ | -------------------------- |
+| Vendedor   | V01 | Carlos Menezes  | 5%     | C001–C004 → `/clientes`    |
+| Vendedor   | V02 | Renata Lima     | 7%     | C005–C007                  |
+| Vendedor   | V03 | Paulo Andrade   | 3%     | C008–C010                  |
+| Supervisor | S01 | Marta Fernandes | —      | Aprovações → `/supervisor` |
+
+Exemplo do PRD (V01 / C001 / TP01): P001 10 un 0%, P006 40 un 2%, P010 24 un 0% → líquido R$ 519,30, status **Enviado**.
 
 ## Como testar
 
+Os testes da API usam o Postgres em `DATABASE_URL` (default `postgres://yandeh:yandeh@localhost:5432/yandeh`) com o seed aplicado. Suba o banco antes (`docker compose up -d postgres` ou o stack completo). Se o banco estiver vazio: `pnpm --filter @yandeh/api db:setup`. Shared e web não precisam do banco.
+
 ```bash
-pnpm test        # Vitest em packages/shared, apps/api e apps/web (sessão, guard, carteira, pedido, histórico e aprovações)
+pnpm install
+pnpm --filter @yandeh/shared build
+pnpm test
 pnpm typecheck
 pnpm lint
 pnpm format:check
 ```
 
-Regras de negócio são testadas em `packages/shared/src/*.test.ts` (funções puras, valores em centavos).
+`pnpm test` é `pnpm -r test` (Vitest em cada pacote). O que cada suíte cobre:
+
+### `packages/shared` — regras puras (números do seed, sem I/O)
+
+Arquivos em `packages/shared/src/*.test.ts`:
+
+- `money` — `toCents` / `formatBRL` (float, half-up, pt-BR)
+- `price` — tabela efetiva e fallback TP01 (`C004`); `unitPriceFor` (P001 = 2690)
+- `sellable` — ativo + preço; P021/P022 inativos; preço 0 é válido
+- `packaging` — Unidades/Lote, múltiplo, P006/P004/P010
+- `totals` — arredondamento por linha; exemplo C001 = 51.930
+- `discount` — maior desconto e status (`>` estrito na alçada)
+- `credit` — reserva de pendentes; C001 380.000, C002 35.000
+- `validate` — bloqueios `EMPTY_ORDER`, `INVALID_QUANTITY`, `INVALID_DISCOUNT`, `PRODUCT_NOT_SELLABLE`, `BELOW_MINIMUM`, `INSUFFICIENT_CREDIT` (alçada não bloqueia)
+- `repeat` — `buildRepeatDraft` (PH001 sem P022, preço atual, desconto 0%; fator alterado)
+- `search` — nome case/acento-insensível; EAN exato `7891831978575` → P009 e P023
+- `business-date` — data civil em `America/Fortaleza` (não UTC)
+- `rules` — constantes (mínimo 30.000, fallback TP01)
+
+### `apps/api` — rotas com `app.inject` (precisa do Postgres com seed)
+
+- `GET /health`, `/sellers` (V01/V02/V03), `/supervisors` (S01)
+- Carteira `GET /sellers/:id/customers` (crédito, fallback, 404)
+- Busca `GET /customers/:id/products?q=` (nome/EAN, só vendáveis, 403 de outra carteira)
+- `POST /orders` — Zod + `validateOrder`; exemplo C001 → 201 Enviado 51.930; alçada → Aguardando aprovação; 422 de regra; crédito com `FOR UPDATE` e corrida; `Idempotency-Key` (reenvio 200, sem header 400); data civil no fuso do negócio
+- Histórico `GET /customers/:id/orders` e `POST .../repeat` (não cria pedido; PH004 Cancelado; 403/404)
+- Supervisor `GET /supervisor/orders` e `POST .../approve|reject` (reserva ↔ utilizado, 409, 422 de crédito)
+- `shared-runtime` — import ESM de `lineTotals` em runtime
+
+### `apps/web` — Vitest + happy-dom (API mockada)
+
+- Sessão Pinia e guard de rota/papel (T-17)
+- Carteira: formatação BRL, destaque abaixo do mínimo, renderização (T-18)
+- Pedido: debounce da busca, P009/P023, aviso de fallback, carrinho Unidades/Lote, totais/bloqueios/envio, histórico e repetir, rascunho em localStorage, retentativa idempotente (rede/5xx/offline; 422 não retenta)
+- Aprovações do supervisor (lista, confirmar, 422 de crédito)
+- Cliente HTTP (`X-Seller-Id` / `X-Supervisor-Id` / `Idempotency-Key`)
+
+Não há e2e Playwright (T-32) nem testes de componente com Vue Test Utils (T-33).
 
 ## Banco de dados
 
 - Schema: `apps/api/src/db/schema.ts`. Nova migração: `pnpm --filter @yandeh/api db:generate`.
 - Dinheiro em centavos (`integer`); quantidades em unidades.
+- Seed em `apps/api/seed/seed.json` — usar como está, sem editar.
 
 ## O que ficou de fora
 
-> _Atualizar ao final._
+Escopo do PRD §5.2, V1 do req. 9 (A20) e opcionais T-32–T-34:
 
-- Offline completo (catálogo/preços offline e sincronização com resolução de conflitos) — V1 cobre apenas rascunho local + reenvio idempotente.
-- Autenticação real (login é simulado escolhendo o vendedor/supervisor).
-- Desconto no total do pedido e descontos cumulativos.
+- Offline completo: catálogo/preços offline, sincronização bidirecional e resolução de conflitos. A V1 cobre rascunho em localStorage (`yandeh.orderDraft`) + retentativa com a mesma `Idempotency-Key`. Sem service worker, sem fila de vários pedidos e sem botão de cancelar pendente (A52, A54).
+- Cache do catálogo do cliente em IndexedDB para busca offline (T-34).
+- Autenticação real (login é escolher vendedor/supervisor; identidade na API via `X-Seller-Id` / `X-Supervisor-Id`).
+- Cadastro/edição de clientes, produtos e tabelas.
+- Faturamento (status `Faturado` só no histórico do seed).
+- Desconto no total do pedido e descontos cumulativos (só % por item).
+- Impostos e frete.
 - Leitura de código de barras pela câmera (busca por EAN digitado).
-- _(completar)_
+- Notificações.
+- Multi-supervisor (só S01).
+- Teste e2e Playwright do fluxo feliz (T-32).
+- Testes de componente do carrinho com Vue Test Utils (T-33); a suíte web cobre store e páginas com happy-dom.
+
+Limitações do seed/regras (não são bugs da V1):
+
+- C004 sem tabela usa TP01 (risco de preço errado; D11, A2).
+- C006 (crédito R$ 100) e C010 (R$ 0) nunca alcançam o mínimo de R$ 300 — envio sempre bloqueado (A19). C002 só cabe entre R$ 300 e R$ 350.
+- Repetir pedido zera descontos e usa preço atual da tabela (A15, A18). Histórico guarda só unidades; se o fator mudar, o ajuste segue RN12/D13.
+- `DECISIONS.md` ainda tem "com mais tempo" em `_a preencher_` (T-29). `AI_LOG.md` ainda é rascunho (T-30).
 
 ## Convenção de commits
 

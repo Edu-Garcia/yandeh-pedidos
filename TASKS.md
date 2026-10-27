@@ -37,8 +37,8 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | F5 — Histórico e repetir (req. 8) | 2       | 2      |
 | F6 — Supervisor (fecha req. 5)    | 2       | 2      |
 | F7 — Offline parcial (req. 9)     | 2       | 2      |
-| F8 — Entrega e docs               | 4       | 0      |
-| **Total**                         | **34**  | **30** |
+| F8 — Entrega e docs               | 4       | 1      |
+| **Total**                         | **34**  | **31** |
 | Opcionais                         | 3       | 0      |
 
 > Sem estimativas de tempo: com IA acelerando a implementação, elas não refletem dados reais. Prioridade: núcleo (F1–F4 + F8, req. 1–7) primeiro. Se o prazo apertar, corte na ordem: opcionais → F7 → F6 (T-25) → F5, e registre em README "o que ficou de fora".
@@ -376,13 +376,14 @@ Validação comum: `pnpm --filter @yandeh/web typecheck && pnpm --filter @yandeh
 
 ## F8 — Entrega e documentação
 
-### [ ] T-28 — README final
+### [x] T-28 — README final
 
 - **Refs:** entregável README.
 - **Depende de:** F1–F7
 - **Aceite:** "como rodar", "como testar" (com o que cada suíte cobre), "o que ficou de fora" completo (sem `_(completar)_`), status atualizado.
 - **Validação manual:** Ler o README do zero: seguir "Como rodar" (`docker compose up --build`) e abrir http://localhost:5173 e `GET http://localhost:3333/health` → `{"status":"ok"}`; seguir "Como testar" (`pnpm test && pnpm typecheck && pnpm lint && pnpm format:check`). Conferir que "o que ficou de fora" não tem `_(completar)_` e que o status descreve o estado atual. Evidência: comandos/saídas colados.
 - **Commit:** `docs: README com como rodar, testar e fora do escopo`
+- **Status:** feito
 
 ### [ ] T-29 — DECISIONS: "com mais tempo" e revisão
 
