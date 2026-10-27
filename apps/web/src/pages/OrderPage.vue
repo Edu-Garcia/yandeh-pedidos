@@ -6,7 +6,7 @@ import {
   type SellerCustomer,
   type ValidationIssue,
 } from '@yandeh/shared'
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import {
   ApiError,
   createOrder,
@@ -24,13 +24,21 @@ import CartLine from '@/components/CartLine.vue'
 import SessionBar from '@/components/SessionBar.vue'
 import { formatCivilDate, formatRemovedItem } from '@/order-history'
 import { PRODUCT_SEARCH_DEBOUNCE_MS } from '@/product-search'
+import { useOnlineStore } from '@/stores/online'
 import { useOrderDraftStore } from '@/stores/order-draft'
 import { useSessionStore } from '@/stores/session'
+import {
+  DRAFT_LOCKED_MESSAGE,
+  isRetryableSubmitFailure,
+  nextSubmitRetryDelayMs,
+  submitPendingMessage,
+} from '@/submit-retry'
 import NotFoundPage from './NotFoundPage.vue'
 
 const props = defineProps<{ clientId: string }>()
 const session = useSessionStore()
 const draft = useOrderDraftStore()
+const connection = useOnlineStore()
 
 const customer = ref<SellerCustomer | null>(null)
 const customerLoading = ref(true)
@@ -85,15 +93,52 @@ const needsApproval = computed(
 const canSend = computed(
   () => !sending.value && issues.value.length === 0 && !hasInlineErrors.value,
 )
+const isSubmitPending = computed(() => draft.isSubmitPending(props.clientId))
+const pendingMessage = computed(() => submitPendingMessage(connection.online))
+const draftLockedMessage = DRAFT_LOCKED_MESSAGE
+const sendLabel = computed(() => {
+  if (sending.value) return 'Enviando…'
+  if (isSubmitPending.value) return 'Tentar de novo'
+  return 'Enviar'
+})
 
 let debounceHandle: ReturnType<typeof setTimeout> | undefined
 let searchSeq = 0
+let stopOnline: (() => void) | undefined
+let retryHandle: ReturnType<typeof setTimeout> | undefined
+let retryAttempt = 0
+let submitInFlight = false
+
+function cancelScheduledRetry(): void {
+  if (retryHandle !== undefined) {
+    clearTimeout(retryHandle)
+    retryHandle = undefined
+  }
+}
+
+function resetRetryState(): void {
+  cancelScheduledRetry()
+  retryAttempt = 0
+}
+
+function scheduleRetry(): void {
+  cancelScheduledRetry()
+  if (!connection.online) return
+  const delay = nextSubmitRetryDelayMs(retryAttempt)
+  retryAttempt += 1
+  retryHandle = setTimeout(() => {
+    retryHandle = undefined
+    void submitOrder()
+  }, delay)
+}
 
 function resetSubmitState(): void {
   sending.value = false
+  submitInFlight = false
   submitError.value = null
   submitIssues.value = []
   submitted.value = null
+  resetRetryState()
 }
 
 function resetRepeatState(): void {
@@ -133,6 +178,9 @@ async function loadCustomer(): Promise<void> {
     }
     customer.value = found
     void loadHistory()
+    if (draft.isSubmitPending(props.clientId)) {
+      void submitOrder()
+    }
   } catch (error) {
     if (isHiddenResourceError(error)) {
       notFound.value = true
@@ -192,7 +240,7 @@ async function runRepeat(orderId: string): Promise<void> {
 }
 
 function requestRepeat(orderId: string): void {
-  if (repeating.value) return
+  if (repeating.value || draft.isSubmitPending(props.clientId)) return
   if (draft.hasDraft(props.clientId)) {
     pendingOverwriteOrderId.value = orderId
     return
@@ -258,42 +306,69 @@ function scheduleSearch(value: string): void {
 }
 
 function addProduct(product: CustomerProduct): void {
+  if (draft.isSubmitPending(props.clientId)) return
   draft.addProduct(props.clientId, product)
 }
 
 async function submitOrder(): Promise<void> {
-  if (!canSend.value || !customer.value) return
+  if (submitInFlight || sending.value || submitted.value || !customer.value) return
+  if (issues.value.length > 0 || hasInlineErrors.value) return
 
+  cancelScheduledRetry()
   sending.value = true
+  submitInFlight = true
   submitError.value = null
   submitIssues.value = []
 
-  const key = draft.ensureIdempotencyKey(props.clientId)
-  const items = draft.linesOf(props.clientId).map((line) => ({
-    productId: line.product.id,
-    quantity: line.quantityUnits,
-    discountPercent: line.discountPercent,
-  }))
-
   try {
+    if (!connection.online) {
+      draft.markSubmitPending(props.clientId)
+      return
+    }
+
+    const key = draft.ensureIdempotencyKey(props.clientId)
+    const items = draft.linesOf(props.clientId).map((line) => ({
+      productId: line.product.id,
+      quantity: line.quantityUnits,
+      discountPercent: line.discountPercent,
+    }))
+
     const order = await createOrder({ customerId: props.clientId, items }, key)
     submitted.value = order
+    resetRetryState()
     draft.clearDraft(props.clientId)
   } catch (error) {
     if (isHiddenResourceError(error)) {
+      resetRetryState()
+      draft.clearSubmitPending(props.clientId)
       notFound.value = true
       return
     }
     if (error instanceof ApiError && error.status === 422 && error.issues !== null) {
+      resetRetryState()
+      draft.clearSubmitPending(props.clientId)
       submitIssues.value = error.issues
       return
     }
+    if (isRetryableSubmitFailure(error)) {
+      draft.markSubmitPending(props.clientId)
+      if (error instanceof ApiError && error.message) {
+        submitError.value = error.message
+      } else {
+        submitError.value = 'Não deu para enviar o pedido. Confira a API e tente de novo.'
+      }
+      scheduleRetry()
+      return
+    }
+    resetRetryState()
+    draft.clearSubmitPending(props.clientId)
     submitError.value =
       error instanceof ApiError && error.message
         ? error.message
         : 'Não deu para enviar o pedido. Confira a API e tente de novo.'
   } finally {
     sending.value = false
+    submitInFlight = false
   }
 }
 
@@ -324,9 +399,29 @@ watch(query, (value) => {
   scheduleSearch(value)
 })
 
+watch(
+  () => connection.online,
+  (isOnline) => {
+    if (!isOnline) {
+      cancelScheduledRetry()
+      return
+    }
+    if (draft.isSubmitPending(props.clientId) && customer.value && !submitted.value) {
+      retryAttempt = 0
+      void submitOrder()
+    }
+  },
+)
+
+onMounted(() => {
+  stopOnline = connection.listen()
+})
+
 onUnmounted(() => {
   if (debounceHandle !== undefined) clearTimeout(debounceHandle)
   searchSeq += 1
+  resetRetryState()
+  stopOnline?.()
 })
 </script>
 
@@ -463,9 +558,13 @@ onUnmounted(() => {
               <button
                 type="button"
                 data-testid="repeat-order"
-                :disabled="repeating"
+                :disabled="repeating || isSubmitPending"
                 class="mt-3 min-h-12 border-b-2 px-1 font-sans text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-safety disabled:border-steel disabled:text-steel"
-                :class="repeating ? 'border-steel text-steel' : 'border-produce text-produce'"
+                :class="
+                  repeating || isSubmitPending
+                    ? 'border-steel text-steel'
+                    : 'border-produce text-produce'
+                "
                 @click="requestRepeat(order.id)"
               >
                 {{ repeating ? 'Repetindo…' : 'Repetir' }}
@@ -578,10 +677,10 @@ onUnmounted(() => {
             <button
               type="button"
               data-testid="add-product"
-              :disabled="draft.hasProduct(customer.id, product.id)"
+              :disabled="isSubmitPending || draft.hasProduct(customer.id, product.id)"
               class="mt-3 min-h-12 border-b-2 px-1 font-sans text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-safety disabled:border-steel disabled:text-steel"
               :class="
-                draft.hasProduct(customer.id, product.id)
+                isSubmitPending || draft.hasProduct(customer.id, product.id)
                   ? 'border-steel text-steel'
                   : 'border-produce text-produce'
               "
@@ -622,12 +721,20 @@ onUnmounted(() => {
           >
             Nenhum item no pedido.
           </p>
-          <ul v-else class="mt-4 space-y-3">
+          <p
+            v-if="isSubmitPending"
+            data-testid="draft-locked"
+            class="-mx-4 mt-4 border-l-4 border-safety bg-safety/20 px-4 py-3 font-sans text-base text-counter"
+          >
+            {{ draftLockedMessage }}
+          </p>
+          <ul v-if="cartLines.length > 0" class="mt-4 space-y-3">
             <CartLine
               v-for="line in cartLines"
               :key="line.product.id"
               :customer-id="customer.id"
               :line="line"
+              :locked="isSubmitPending"
               :notice="noticeByProductId.get(line.product.id) ?? null"
             />
           </ul>
@@ -646,6 +753,13 @@ onUnmounted(() => {
         class="mb-2 font-sans text-sm text-produce"
       >
         Rascunho salvo
+      </p>
+      <p
+        v-if="isSubmitPending"
+        data-testid="submit-pending"
+        class="-mx-4 mb-3 border-l-4 border-safety bg-safety/20 px-4 py-2 font-sans text-sm text-counter"
+      >
+        {{ pendingMessage }}. {{ draftLockedMessage }}
       </p>
       <dl class="space-y-1">
         <div class="flex items-baseline justify-between gap-3">
@@ -713,7 +827,7 @@ onUnmounted(() => {
         :class="canSend ? 'border-produce bg-produce text-receipt' : 'border-steel bg-floor'"
         @click="submitOrder"
       >
-        {{ sending ? 'Enviando…' : 'Enviar' }}
+        {{ sendLabel }}
       </button>
     </footer>
   </div>
