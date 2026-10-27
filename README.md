@@ -3,7 +3,7 @@
 Módulo de montagem de pedidos para vendedores externos. Requisitos e regras: [`PRD.md`](PRD.md).
 Decisões: [`DECISIONS.md`](DECISIONS.md) · Assunções: [`ASSUMPTIONS.md`](ASSUMPTIONS.md) · Uso de IA: [`AI_LOG.md`](AI_LOG.md) · Plano de tarefas: [`TASKS.md`](TASKS.md).
 
-> **Status:** F0–F7 e T-28 (README final) concluídas (req. 1–8 e V1 do req. 9: rascunho local + reenvio idempotente). Faltam T-29 (`DECISIONS.md`, campos "com mais tempo"), T-30 (`AI_LOG.md`) e T-31 (verificação a partir de clone limpo). Opcionais T-32–T-34 não feitos.
+> **Status:** F0–F7, T-28 (README) e T-29 (`DECISIONS.md`) concluídas (req. 1–8 e V1 do req. 9: rascunho local + reenvio idempotente). Faltam T-30 (`AI_LOG.md`) e T-31 (verificação a partir de clone limpo). Opcionais T-32–T-34 não feitos.
 >
 > O desafio foi entregue ao recrutador em 26/10/2026 com o repositório incompleto. O estado no prazo é o commit [`af003cc`](https://github.com/Edu-Garcia/yandeh-pedidos/tree/af003cc9b2f8b06639fb757cd27388568e8a2c51) (merge do PR #25, T-22): no `TASKS.md` daquele commit, T-00–T-22 estavam `[x]` (F0–F4 e a API de histórico/repetir; 25 de 34). Depois do prazo: tela de histórico (T-23), supervisor (T-24/T-25) e offline parcial V1 (T-26/T-27).
 
@@ -141,7 +141,7 @@ Limitações do seed/regras (não são bugs da V1):
 - C004 sem tabela usa TP01 (risco de preço errado; D11, A2).
 - C006 (crédito R$ 100) e C010 (R$ 0) nunca alcançam o mínimo de R$ 300 — envio sempre bloqueado (A19). C002 só cabe entre R$ 300 e R$ 350.
 - Repetir pedido zera descontos e usa preço atual da tabela (A15, A18). Histórico guarda só unidades; se o fator mudar, o ajuste segue RN12/D13.
-- `DECISIONS.md` ainda tem "com mais tempo" em `_a preencher_` (T-29). `AI_LOG.md` ainda é rascunho (T-30).
+- `AI_LOG.md` ainda é rascunho (T-30).
 
 ## Convenção de commits
 

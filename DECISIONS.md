@@ -11,7 +11,7 @@ Decisões marcadas **[autor]** foram tomadas pelo candidato (com os motivos dele
 - **Alternativas:** outra stack (exigiria justificativa).
 - **Escolha:** Vue 3, Node.js + TypeScript, PostgreSQL.
 - **Por quê:** é a stack recomendada e usada pelo time; reduz atrito na avaliação e na conversa.
-- **Com mais tempo:** _a preencher._
+- **Com mais tempo:** não trocaria a stack. O ganho estaria no que ficou de fora: e2e do fluxo feliz (T-32), testes de componente do carrinho (T-33) e a verificação a partir de clone limpo (T-31).
 
 ## D2 — Backend: Fastify [autor]
 
@@ -19,7 +19,7 @@ Decisões marcadas **[autor]** foram tomadas pelo candidato (com os motivos dele
 - **Alternativas:** Express (tipagem fraca, erros assíncronos tratados manualmente); NestJS (boilerplate e "mágica" de DI/decorators difícil de explicar ao vivo).
 - **Escolha:** Fastify + Zod.
 - **Por quê:** rápido e flexível; validação por schema e boa tipagem (Zod/TypeBox) facilitam testes (`app.inject`) e estrutura. Express/NestJS são mais pesados/complexos sem necessidade para o escopo.
-- **Com mais tempo:** _a preencher._
+- **Com mais tempo:** manteria Fastify + Zod. O que faltou não é outro framework: é o roteiro R1–R9 num clone limpo (T-31) e um e2e que exercite as rotas no browser (T-32).
 
 ## D3 — Acesso a dados: Drizzle ORM + drizzle-kit [autor]
 
@@ -27,7 +27,7 @@ Decisões marcadas **[autor]** foram tomadas pelo candidato (com os motivos dele
 - **Alternativas:** Prisma (exige `prisma generate`, imagem Docker mais pesada, problemas de engine/OpenSSL no Alpine, particularidades em monorepo pnpm, menos flexível para SQL fino); Knex/SQL puro (tipagem manual e boilerplate).
 - **Escolha:** Drizzle ORM com migrações via drizzle-kit.
 - **Por quê:** schema em TypeScript com tipos inferidos pelo compilador, sem etapa de geração de código; próximo do SQL.
-- **Com mais tempo:** _a preencher._
+- **Com mais tempo:** manteria Drizzle. O SQL fino da reserva (`FOR UPDATE` em T-15) e o `UNIQUE` da idempotência (T-16) já dependem disso. O que acrescentaria é auditoria das movimentações de crédito (hoje só o saldo) — fora do escopo do PRD §5.2.
 
 ## D4 — UI: Tailwind CSS [autor]
 
@@ -35,7 +35,7 @@ Decisões marcadas **[autor]** foram tomadas pelo candidato (com os motivos dele
 - **Alternativas:** PrimeVue (visual genérico de admin); Vuetify (pesado e opinativo).
 - **Escolha:** Tailwind CSS v4.
 - **Por quê:** liberdade visual total, layout livre, combina com a skill `frontend-design`.
-- **Com mais tempo:** _a preencher._
+- **Com mais tempo:** manteria Tailwind. Fecharia os testes de componente do carrinho (T-33) e um e2e do fluxo feliz (T-32); a direção visual já atende o viewport de ~390 px das tarefas F4–F7.
 
 ## D5 — Monorepo pnpm com `packages/shared` para regras de negócio [autor]
 
@@ -43,7 +43,7 @@ Decisões marcadas **[autor]** foram tomadas pelo candidato (com os motivos dele
 - **Alternativas:** regras só no backend (UI sem feedback offline); duplicar no front e no back (divergência); repositórios separados.
 - **Escolha:** pnpm workspaces com `apps/web`, `apps/api` e `packages/shared` (funções puras: preço, embalagem, alçada, totais, mínimo, crédito).
 - **Por quê:** regras separadas e reutilizadas nos dois lados; coerente com sistemas multi-repo/microsserviços que compartilham regras, skills e docs. Custo aceito: Docker/build um pouco mais complexos.
-- **Com mais tempo:** _a preencher._
+- **Com mais tempo:** manteria o pacote compartilhado. O `exports` aponta para `dist/` (T-11b): `pnpm --filter @yandeh/shared build` é obrigatório antes de typecheck/testes da API e da web. Automatizaria esse build no `pnpm dev`/`pnpm test` para reduzir o atrito.
 
 ## D6 — Escopo: 1–6 + crédito (7) + histórico/repetir (8) + offline parcial (9) [autor]
 
@@ -51,7 +51,7 @@ Decisões marcadas **[autor]** foram tomadas pelo candidato (com os motivos dele
 - **Alternativas:** só obrigatórios; offline completo.
 - **Escolha:** obrigatórios + 7 + 8 + V1 de 9 (rascunho persistido localmente + envio com retentativa e chave de idempotência). Sync offline completo documentado como trabalho futuro.
 - **Por quê:** crédito e histórico agregam valor real com pouco custo; offline completo é caro (catálogo local, conflitos), mas o cenário de sinal ruim justifica ao menos não perder o pedido nem duplicá-lo.
-- **Com mais tempo:** _a preencher._
+- **Com mais tempo:** cache do catálogo em IndexedDB (T-34), sincronização bidirecional e resolução de conflitos — já no README como fora da V1. Sem service worker, sem fila de vários pedidos e sem botão de cancelar pendente (A52, A54).
 
 ## D7 — Desconto percentual por item; alçada pelo MAIOR desconto de item [autor]
 
@@ -59,7 +59,7 @@ Decisões marcadas **[autor]** foram tomadas pelo candidato (com os motivos dele
 - **Alternativas:** desconto no total; média ponderada dos descontos; acúmulo item + pedido.
 - **Escolha:** % por item (padrão do histórico do seed); sem desconto no pedido e sem acúmulo; se algum item tiver desconto > alçada → "Aguardando aprovação".
 - **Por quê:** conservador e simples; um desconto alto não se esconde num item barato (como aconteceria na média ponderada).
-- **Com mais tempo:** _a preencher._
+- **Com mais tempo:** refinaria a regra com o PO (alçada por valor em R$, teto por pedido, ou média ponderada). No teste técnico não há esse canal; a comparação permanece `>` estrito em `statusForDiscount` (`packages/shared/src/discount.ts`).
 
 ## D8 — Dinheiro em centavos inteiros, arredondamento por linha [autor]
 
@@ -67,7 +67,7 @@ Decisões marcadas **[autor]** foram tomadas pelo candidato (com os motivos dele
 - **Alternativas:** decimal.js / numeric no banco; arredondar só no total.
 - **Escolha:** inteiros em centavos; desconto arredondado (half-up) por linha; total = soma das linhas.
 - **Por quê:** determinístico, fácil de testar, bate com o que se imprime por linha.
-- **Com mais tempo:** _a preencher._
+- **Com mais tempo:** se o domínio crescesse (impostos, frete, outras moedas — fora do PRD §5.2), avaliaria `numeric` no banco. O seed e o PRD §6 cabem em `Cents`; `toCents` / `lineTotals` em `packages/shared` já cobrem o exemplo C001 = 51.930.
 
 ## D9 — Quantidade em unidades com campos interligados Unidades e Lote [Decisão do autor]
 
@@ -75,7 +75,7 @@ Decisões marcadas **[autor]** foram tomadas pelo candidato (com os motivos dele
 - **Alternativas:** guardar quantidade em embalagens; campo livre com validação; seletor de modo (unidade ou embalagem) por item (versão anterior, substituída).
 - **Escolha:** cada item tem dois campos interligados, **Unidades** e **Lote** (CX ou FD; produtos `UN` fator 1 mostram só Unidades). Lote → `Unidades = lote × fator`; Unidades múltiplo do fator → Lote = `unidades / fator`, senão Lote vazio. Com `venda_somente_multiplo = true`, Unidades fica somente leitura e só muda pelo Lote. Banco continua guardando só unidades. Comportamento no repetir pedido: ver D13.
 - **Por quê:** o vendedor pode pensar em unidades ou em lotes sem trocar de modo; os dois valores nunca divergem; a regra "só por lote" é garantida pela própria UI em vez de um erro depois do fato; histórico do seed está em unidades.
-- **Com mais tempo:** _a preencher._
+- **Com mais tempo:** testes de componente do carrinho (T-33). Num produto real, refinaria com o PO se vale persistir o modo de entrada (já considerado e recusado em D13).
 
 ## D10 — Crédito: bloqueio, reserva por pendentes, supervisor [autor]
 
@@ -83,7 +83,7 @@ Decisões marcadas **[autor]** foram tomadas pelo candidato (com os motivos dele
 - **Alternativas:** apenas avisar; não reservar crédito de pendentes.
 - **Escolha:** bloqueia envio se total líquido > disponível; "Aguardando aprovação" reserva crédito; rejeição libera; tela simples para S01 aprovar/rejeitar.
 - **Por quê:** evita que pedidos pendentes estourem o limite quando aprovados.
-- **Com mais tempo:** _a preencher._
+- **Com mais tempo:** expiração de reserva, multi-supervisor e notificações — fora do PRD §5.2. A tela de S01 (T-24/T-25) fecha o fluxo do req. 5; a revalidação na aprovação já exclui o próprio pendente (A42).
 
 ## D11 — Cliente sem tabela usa TP01 (fallback) [autor]
 
@@ -108,3 +108,59 @@ Decisões marcadas **[autor]** foram tomadas pelo candidato (com os motivos dele
 - **Escolha:** (a). Nada muda na persistência. No repetir pedido: produto não só múltiplo → mesmas unidades, Lote vazio e mensagem; produto `venda_somente_multiplo = true` com unidades que não são múltiplas do fator atual → o sistema deduz que o fator mudou e arredonda o lote para cima (`lote = ceil(unidades_hist / fator_atual)`, `unidades = lote × fator_atual`), com a mensagem "A quantidade de unidades por lote mudou para X; a quantidade foi ajustada para N lote(s) (M unidades)". Ex.: 30 un, fator atual 12 → 3 lotes = 36 un.
 - **Por quê:** mantém o modelo simples (só unidades); para itens vendáveis por unidade a quantidade original continua válida; para itens só por lote, a dedução automática evita um item travado e o vendedor revisa antes de enviar. Trade-off: arredondar para cima aumenta o valor do pedido (crédito, mínimo e alçada são recalculados normalmente).
 - **Com mais tempo:** num cenário real, refinaria com o PO (arredondar para cima, para baixo ou para o mais próximo); um snapshot do fator permitiria ao histórico mostrar o lote da época.
+
+## D14 — Recurso sem permissão responde como 404 [autor]
+
+- **Contexto:** login é simulado (A1); a Web e a API precisam tratar URL inexistente, papel errado e recurso alheio sem ensinar quais rotas ou ids existem.
+- **Alternativas:** 403 explícito em todo lugar; redirecionar para a home do papel; 404 só em URL inexistente e 403 nas demais.
+- **Escolha:** na Web, rota de outro papel, URL inexistente e 403/404 da API renderizam a mesma `NotFoundPage` ("Página não encontrada") **sem mudar a URL** (`apps/web/src/router/index.ts`, `isHiddenResourceError` em `apps/web/src/api.ts`). Sem sessão, qualquer URL que não seja `/` redireciona para a seleção — também para não vazar o mapa de rotas (T-17). Na API, supervisor inválido/inexistente ou header ausente em `/supervisor/*` recebe o **mesmo 404 genérico do Fastify** para rota desconhecida (`reply.callNotFound()` em `apps/api/src/routes/supervisor.ts`). Pedido de outro cliente ou de outro time → 404 `Pedido não encontrado`, igual a inexistente (A33, A41). Cliente de outra carteira continua **403** na API (RN01 / T-13); a Web mascara esse 403 como o mesmo 404.
+- **Por quê:** não revelar quais URLs e recursos existem. O 403 da carteira na API permanece para o contrato das tarefas T-13/T-14; o replay da `Idempotency-Key` só roda depois da carteira, para um 409 não vazar que a chave existe (T-16).
+- **Com mais tempo:** autenticação real (fora do PRD §5.2) substituiria o mascaramento por sessão e papéis de verdade. O 403 da carteira na API e o 404 da Web poderiam então convergir sem o header simulado.
+
+## D15 — Preço zero é preço válido; seed usado como está [autor]
+
+- **Contexto:** o seed tem imperfeições de dados reais (C004 sem tabela, EAN duplicado, inativos no histórico). Surgiu a dúvida se `preco_unidade = 0` seria ausência.
+- **Alternativas:** tratar 0 como "sem preço" (`null`); recusar o item; validar o seed e corrigir inconsistências.
+- **Escolha:** 0 é preço válido. `unitPriceFor` devolve `null` só quando o produto não está na tabela (`packages/shared/src/price.ts`). `isSellable` aceita 0 (A27). Sem guards extras contra seed corrompido — `apps/api/seed/seed.json` é usado como está.
+- **Por quê:** o desafio pede o seed intacto; 0 não aparece como ausência no `_meta`. Inventar validação de catálogo no teste técnico misturaria regra de venda com higiene de cadastro.
+- **Com mais tempo:** num produto real, o cadastro teria invariantes (preço > 0, tabela obrigatória) e um pipeline de qualidade do catálogo. Aqui o risco de dado ruim fica explícito (C004/D11, A19).
+
+## D16 — UI sem id de produto; carteira mostra o nome da tabela [autor]
+
+- **Contexto:** a API usa ids (`P001`, `TP01`) como chave. O vendedor em campo precisa de descrição, EAN e preço — não de código interno.
+- **Alternativas:** mostrar o id ao lado da descrição; prefixar "Tabela TP01"; só o badge de fallback, sem o nome.
+- **Escolha:** listas de produto (busca e carrinho) mostram **descrição, EAN e preço** (`OrderPage.vue`, `CartLine.vue`). O id fica só como chave interna (`:key`, `data-product-id`, payload). Avisos de repetir usam a descrição ("Biscoito Recheado Chocolate 140g removido (inativo)"), nunca `P022` (A36, A39). A carteira mostra o **nome** da tabela efetiva (`priceTableName`: Tabela Padrão / Volume / Interior), não o id `TP01` (PR #21). O badge "Padrão (fallback)" cobre o C004.
+- **Por quê:** os nomes do seed já começam com "Tabela"; prefixar o id gerava "Tabela TP01", que não ajuda o vendedor. Ids de produto não são critério de escolha quando a descrição e o EAN distinguem P009 de P023.
+- **Com mais tempo:** ids continuariam na API e nos testes. Se o suporte interno precisasse deles, um modo restrito — não a tela de campo.
+
+## D17 — Aprovar/Rejeitar do supervisor exige confirmação inline [autor]
+
+- **Contexto:** aprovar consome crédito; rejeitar libera a reserva. São ações definitivas (só pendente muda; repetir a mesma decisão → 409).
+- **Alternativas:** um toque já chama a API; modal de confirmação; desfazer depois do fato.
+- **Escolha:** confirmação inline no card, no mesmo padrão do Substituir da T-23: o toque só mostra a ação + cliente + total; Cancelar volta ao normal; Confirmar executa (`ApprovalsPage.vue`). Só um pedido em confirmação por vez (A46).
+- **Por quê:** ações definitivas. Um toque acidental na lista de pendentes mudaria crédito sem o supervisor reler o total.
+- **Com mais tempo:** a confirmação cobre o escopo (um supervisor, S01). Histórico de decisões, desfazer e multi-supervisor estão fora do PRD §5.2.
+
+## D18 — Rascunho pendente de envio fica travado; idempotência por chave [autor]
+
+- **Contexto:** req. 9 parcial (sinal ruim). A mesma `Idempotency-Key` na API faz replay 200 se for o mesmo vendedor e o mesmo cliente, **sem comparar o resto do corpo** (T-16). Um rascunho editado e reenviado com a mesma chave gravaria um pedido e devolveria outro.
+- **Alternativas:** cancelar o pendente e gerar chave nova; comparar hash do body na API; permitir editar e aceitar o replay silencioso.
+- **Escolha:** enquanto `submitPending`, a UI trava adicionar/remover, quantidade, desconto e Repetir/Substituir (`order-draft.ts`, `OrderPage.vue`). Sem botão de cancelar pendente (A54). A chave nasce no primeiro item persistido e só muda se o rascunho for limpo ou substituído por um Repeat. Na API: mesma chave + mesmo vendedor + mesmo cliente → 200 com o pedido original; outro vendedor ou cliente → 409 `IDEMPOTENCY_KEY_CONFLICT`, sem dados do pedido existente.
+- **Por quê:** a mesma chave nunca deve levar um corpo diferente. Cancelar pendente exigiria outra chave e abriria janela de duplicata se o primeiro POST ainda estivesse em voo.
+- **Com mais tempo:** botão de cancelar pendente (com chave nova só depois de desistir de verdade), fila de vários pedidos e service worker — já no README como fora da V1. Hash do payload na API foi recusado na T-16 para não vazar o pedido original no 409.
+
+## D19 — Processo: tarefas pequenas, um commit por task, merge sem squash [autor]
+
+- **Contexto:** o autor precisa explicar cada trecho ao vivo; o histórico é entregável do desafio.
+- **Alternativas:** commits grandes por fase; squash no merge; várias tarefas no mesmo PR.
+- **Escolha:** tarefas de escopo fechado em `TASKS.md` (uma por commit, Conventional Commits, trailer `IA:`). PR com testes e validação manual colada. Merge **sem squash**. Problemas encontrados numa tarefa se resolvem nela.
+- **Por quê:** mudanças pequenas e explicáveis; o `git log` mostra a evolução (F1 regras → F3 API → F4 telas → F8 docs) e a linha `IA:` em cada commit.
+- **Com mais tempo:** T-31 (clone limpo + roteiro R1–R9) e os opcionais T-32–T-34. O processo em si não mudaria.
+
+## D20 — Data civil do pedido no fuso do negócio [autor]
+
+- **Contexto:** a T-14 gravava `pedidos.data` com `toISOString().slice(0, 10)` (UTC). Clientes do seed são do Ceará; depois das 21h em Fortaleza (UTC−3) o pedido ficava com a data do dia seguinte (T-14b / PR #17).
+- **Alternativas:** gravar instante UTC e formatar na leitura; fuso da máquina do servidor; fuso do browser.
+- **Escolha:** `businessDate(now, timeZone)` em `@yandeh/shared` (`Intl.DateTimeFormat('en-CA')`, relógio injetável). A API lê `BUSINESS_TIMEZONE` (default `America/Fortaleza`) e grava a data civil desse fuso. Sem guard contra fuso inválido (escopo da T-14b).
+- **Por quê:** a data que o vendedor e o histórico mostram é a do negócio, não a do UTC. Fortaleza não tem horário de verão; o default cobre o seed.
+- **Com mais tempo:** validar o fuso na subida da API e, se o cadastro crescesse para outros estados, fuso por cliente. O front já formata `YYYY-MM-DD` fatiando a string (A38), sem `new Date`.

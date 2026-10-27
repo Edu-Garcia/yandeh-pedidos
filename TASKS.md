@@ -37,8 +37,8 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | F5 — Histórico e repetir (req. 8) | 2       | 2      |
 | F6 — Supervisor (fecha req. 5)    | 2       | 2      |
 | F7 — Offline parcial (req. 9)     | 2       | 2      |
-| F8 — Entrega e docs               | 4       | 1      |
-| **Total**                         | **34**  | **31** |
+| F8 — Entrega e docs               | 4       | 2      |
+| **Total**                         | **34**  | **32** |
 | Opcionais                         | 3       | 0      |
 
 > Sem estimativas de tempo: com IA acelerando a implementação, elas não refletem dados reais. Prioridade: núcleo (F1–F4 + F8, req. 1–7) primeiro. Se o prazo apertar, corte na ordem: opcionais → F7 → F6 (T-25) → F5, e registre em README "o que ficou de fora".
@@ -385,13 +385,14 @@ Validação comum: `pnpm --filter @yandeh/web typecheck && pnpm --filter @yandeh
 - **Commit:** `docs: README com como rodar, testar e fora do escopo`
 - **Status:** feito
 
-### [ ] T-29 — DECISIONS: "com mais tempo" e revisão
+### [x] T-29 — DECISIONS: "com mais tempo" e revisão
 
 - **Refs:** entregável DECISIONS (≥ 5).
 - **Depende de:** T-28
 - **Aceite:** nenhum `_a preencher_`; decisões tomadas durante as tarefas registradas; PRD e ASSUMPTIONS coerentes com o código.
 - **Validação manual:** Ler `DECISIONS.md` do zero: `rg '_a preencher_' DECISIONS.md` → 0 matches; cada decisão tem contexto/alternativas/escolha/por quê/com mais tempo; cruzar com o código (centavos, fallback TP01, alçada pelo maior desconto) e com PRD/ASSUMPTIONS. Evidência: comando `rg` vazio + trecho das decisões preenchidas.
 - **Commit:** `docs: completa decisões com o que faria com mais tempo`
+- **Status:** feito
 
 ### [ ] T-30 — AI_LOG: momentos reais e mapa de autoria
 
