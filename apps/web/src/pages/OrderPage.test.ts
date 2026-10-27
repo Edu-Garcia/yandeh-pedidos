@@ -7,7 +7,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, type RepeatDraftResponse } from '@/api'
 import { PRODUCT_SEARCH_DEBOUNCE_MS } from '@/product-search'
 import { routes } from '@/router'
-import { DISCOUNT_ERROR, QUANTITY_ERROR } from '@/stores/order-draft'
+import {
+  DISCOUNT_ERROR,
+  DRAFT_STORAGE_KEY,
+  QUANTITY_ERROR,
+  type PersistedOrderDraft,
+} from '@/stores/order-draft'
 import { useSessionStore } from '@/stores/session'
 import OrderPage from './OrderPage.vue'
 
@@ -199,6 +204,12 @@ function setField(root: HTMLElement, testId: string, value: string): void {
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function persistedDraft(customerId: string): PersistedOrderDraft | undefined {
+  const raw = localStorage.getItem(DRAFT_STORAGE_KEY)
+  if (!raw) return undefined
+  return (JSON.parse(raw) as Record<string, PersistedOrderDraft>)[customerId]
+}
 
 function jsonResponse(status: number, body: unknown) {
   return {
@@ -476,6 +487,44 @@ describe('OrderPage', () => {
     await waitForText(el, 'Mercadinho São José')
   })
 
+  it('mostra "Rascunho salvo" e restaura itens e a mesma chave ao recarregar', async () => {
+    fetchSellerCustomers.mockResolvedValue(v01Wallet)
+    const first = await render('C001')
+    await waitForText(first, 'Mercadinho São José')
+    expect(first.querySelector('[data-testid="draft-saved"]')).toBeNull()
+
+    await addFromSearch(first, p001)
+    setField(cartLine(first, 'P001'), 'cart-units', '10')
+    await nextTick()
+
+    expect(first.querySelector('[data-testid="draft-saved"]')?.textContent).toContain(
+      'Rascunho salvo',
+    )
+    const key = persistedDraft('C001')?.idempotencyKey
+    expect(key).toMatch(UUID_RE)
+    expect(persistedDraft('C001')?.lines[0]?.quantityUnits).toBe(10)
+    expect(first.textContent).not.toContain('P001')
+
+    mounted?.unmount()
+    mounted = null
+    host?.remove()
+    host = null
+
+    const second = await render('C001')
+    await waitForText(second, 'Mercadinho São José')
+    await waitForText(second, 'Arroz Branco Tipo 1 5kg')
+
+    expect(
+      (cartLine(second, 'P001').querySelector('[data-testid="cart-units"]') as HTMLInputElement)
+        .value,
+    ).toBe('10')
+    expect(persistedDraft('C001')?.idempotencyKey).toBe(key)
+    expect(second.querySelector('[data-testid="draft-saved"]')?.textContent).toContain(
+      'Rascunho salvo',
+    )
+    expect(second.textContent).not.toContain('P001')
+  })
+
   it('adiciona da busca sem mostrar o id do produto', async () => {
     fetchSellerCustomers.mockResolvedValue(v01Wallet)
     const el = await render('C001')
@@ -715,6 +764,10 @@ describe('OrderPage', () => {
       'falha temporária',
     )
     expect(el.querySelector('[data-testid="order-result"]')).toBeNull()
+    expect(el.querySelector('[data-testid="draft-saved"]')).not.toBeNull()
+    const keyAfterFailure = persistedDraft('C001')?.idempotencyKey
+    expect(keyAfterFailure).toMatch(UUID_RE)
+    expect(persistedDraft('C001')?.lines).toHaveLength(3)
 
     sendButton(el).click()
     await waitForText(el, 'Enviado')
@@ -724,7 +777,9 @@ describe('OrderPage', () => {
     const secondHeaders = new Headers((fetchMock.mock.calls[1] as [string, RequestInit])[1].headers)
     const firstKey = firstHeaders.get('Idempotency-Key')
     expect(firstKey).toMatch(UUID_RE)
+    expect(firstKey).toBe(keyAfterFailure)
     expect(secondHeaders.get('Idempotency-Key')).toBe(firstKey)
+    expect(persistedDraft('C001')).toBeUndefined()
     expect(firstHeaders.get('X-Seller-Id')).toBe('V01')
     const body = JSON.parse(String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body)) as {
       customerId: string
@@ -789,6 +844,9 @@ describe('OrderPage', () => {
     )
     expect(el.querySelector('[data-testid="order-result"]')).toBeNull()
     expect(el.querySelector('[data-testid="cart"]')).not.toBeNull()
+    expect(el.querySelector('[data-testid="draft-saved"]')).not.toBeNull()
+    expect(persistedDraft('C001')?.lines).toHaveLength(3)
+    expect(persistedDraft('C001')?.idempotencyKey).toMatch(UUID_RE)
   })
 
   it('mostra o resultado Enviado e limpa o rascunho', async () => {
@@ -806,6 +864,8 @@ describe('OrderPage', () => {
     expect(result?.textContent).toContain('O pedido foi enviado.')
     expect(el.querySelector('[data-testid="cart"]')).toBeNull()
     expect(el.querySelector('[data-testid="order-totals"]')).toBeNull()
+    expect(el.querySelector('[data-testid="draft-saved"]')).toBeNull()
+    expect(persistedDraft('C001')).toBeUndefined()
     expect(el.textContent).not.toContain('P001')
     expect(normalizeBRL(result?.textContent ?? '')).toContain(normalizeBRL(formatBRL(51930)))
 

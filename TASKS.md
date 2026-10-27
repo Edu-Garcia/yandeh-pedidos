@@ -36,9 +36,9 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | F4 — Telas (req. 1–5, 7)          | 5       | 5      |
 | F5 — Histórico e repetir (req. 8) | 2       | 2      |
 | F6 — Supervisor (fecha req. 5)    | 2       | 2      |
-| F7 — Offline parcial (req. 9)     | 2       | 0      |
+| F7 — Offline parcial (req. 9)     | 2       | 1      |
 | F8 — Entrega e docs               | 4       | 0      |
-| **Total**                         | **34**  | **28** |
+| **Total**                         | **34**  | **29** |
 | Opcionais                         | 3       | 0      |
 
 > Sem estimativas de tempo: com IA acelerando a implementação, elas não refletem dados reais. Prioridade: núcleo (F1–F4 + F8, req. 1–7) primeiro. Se o prazo apertar, corte na ordem: opcionais → F7 → F6 (T-25) → F5, e registre em README "o que ficou de fora".
@@ -350,15 +350,18 @@ Validação comum: `pnpm --filter @yandeh/web typecheck && pnpm --filter @yandeh
 
 ## F7 — Offline parcial (req. 9, V1)
 
-### [ ] T-26 — Rascunho persistido localmente
+### [x] T-26 — Rascunho persistido localmente
 
 - **Refs:** RN13; A20; R9.
 - **Depende de:** T-21
 - **Escopo:** rascunho por cliente (itens + `idempotencyKey` UUID) em localStorage; restaura ao recarregar; limpa após envio confirmado; indicador "rascunho salvo".
 - **Fora:** catálogo/preço offline, sincronização bidirecional.
 - **Aceite:** montar pedido C001, recarregar → itens e chave mantidos; após envio, rascunho some.
+- **Validação:** `pnpm --filter @yandeh/web typecheck && pnpm --filter @yandeh/web build`; `pnpm --filter @yandeh/web test` (persistir, restaurar, chave mantida, isolamento por cliente, limpeza após envio, persistência após 5xx/422).
 - **Validação manual:** Logar V01, montar pedido C001 (pelo menos P001 10 un). Recarregar → itens e a mesma `idempotencyKey` permanecem; indicador "rascunho salvo". Enviar com sucesso → rascunho some do localStorage. Evidência: screenshot do indicador + DevTools Application/localStorage antes e depois do envio.
 - **Commit:** `feat(web): persistência local do rascunho do pedido`
+- **Status:** feito
+- **Docs:** A47–A49; DECISIONS.md e seed.json intactos.
 
 ### [ ] T-27 — Retentativa de envio com a mesma chave
 

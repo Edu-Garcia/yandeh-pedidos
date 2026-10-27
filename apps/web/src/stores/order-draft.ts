@@ -18,6 +18,8 @@ import {
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
+export const DRAFT_STORAGE_KEY = 'yandeh.orderDraft'
+
 /** Mensagens iguais ao PRD §8, usadas no erro inline da T-20 (sem `validateOrder`). */
 export const QUANTITY_ERROR = 'Quantidade não inteira, < 1 ou fora do múltiplo da embalagem'
 export const DISCOUNT_ERROR = 'Desconto fora de 0–100%'
@@ -26,6 +28,11 @@ export interface DraftLine {
   product: CustomerProduct
   quantityUnits: number
   discountPercent: number
+}
+
+export interface PersistedOrderDraft {
+  idempotencyKey: string
+  lines: DraftLine[]
 }
 
 export interface DraftLineView {
@@ -108,10 +115,39 @@ export function buildLineView(line: DraftLine): DraftLineView {
   }
 }
 
-/** Rascunho do pedido em unidades, por cliente (RN05, D9). Sem persistência — isso é T-26. */
+function readAllPersisted(): Record<string, PersistedOrderDraft> {
+  const raw = localStorage.getItem(DRAFT_STORAGE_KEY)
+  if (!raw) return {}
+  return JSON.parse(raw) as Record<string, PersistedOrderDraft>
+}
+
+function writeAllPersisted(drafts: Record<string, PersistedOrderDraft>): void {
+  if (Object.keys(drafts).length === 0) {
+    localStorage.removeItem(DRAFT_STORAGE_KEY)
+    return
+  }
+  localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(drafts))
+}
+
+function hydrateFromStorage(): {
+  lines: Record<string, DraftLine[]>
+  keys: Record<string, string>
+} {
+  const persisted = readAllPersisted()
+  const lines: Record<string, DraftLine[]> = {}
+  const keys: Record<string, string> = {}
+  for (const [customerId, draft] of Object.entries(persisted)) {
+    lines[customerId] = draft.lines
+    keys[customerId] = draft.idempotencyKey
+  }
+  return { lines, keys }
+}
+
+/** Rascunho do pedido em unidades, por cliente (RN05, D9). Persistido em localStorage (RN13, A20, T-26). */
 export const useOrderDraftStore = defineStore('orderDraft', () => {
-  const linesByCustomer = ref<Record<string, DraftLine[]>>({})
-  const idempotencyKeyByCustomer = ref<Record<string, string>>({})
+  const hydrated = hydrateFromStorage()
+  const linesByCustomer = ref<Record<string, DraftLine[]>>(hydrated.lines)
+  const idempotencyKeyByCustomer = ref<Record<string, string>>(hydrated.keys)
 
   function linesOf(customerId: string): DraftLine[] {
     return linesByCustomer.value[customerId] ?? []
@@ -119,6 +155,22 @@ export const useOrderDraftStore = defineStore('orderDraft', () => {
 
   function hasProduct(customerId: string, productId: string): boolean {
     return linesOf(customerId).some((line) => line.product.id === productId)
+  }
+
+  function persistCustomer(customerId: string): void {
+    const drafts = readAllPersisted()
+    const lines = linesOf(customerId)
+    if (lines.length === 0) {
+      delete drafts[customerId]
+      const remainingKeys = { ...idempotencyKeyByCustomer.value }
+      delete remainingKeys[customerId]
+      idempotencyKeyByCustomer.value = remainingKeys
+      writeAllPersisted(drafts)
+      return
+    }
+    const key = ensureIdempotencyKey(customerId)
+    drafts[customerId] = { idempotencyKey: key, lines }
+    writeAllPersisted(drafts)
   }
 
   function replaceCustomerLines(customerId: string, lines: DraftLine[]): void {
@@ -142,6 +194,7 @@ export const useOrderDraftStore = defineStore('orderDraft', () => {
       ...linesOf(customerId),
       { product, quantityUnits: defaultUnits(product), discountPercent: 0 },
     ])
+    persistCustomer(customerId)
   }
 
   function setUnits(customerId: string, productId: string, raw: string): void {
@@ -149,6 +202,7 @@ export const useOrderDraftStore = defineStore('orderDraft', () => {
       if (isUnitsReadOnly(line.product)) return line
       return { ...line, quantityUnits: parseDecimalInput(raw) }
     })
+    persistCustomer(customerId)
   }
 
   function setLots(customerId: string, productId: string, raw: string): void {
@@ -157,6 +211,7 @@ export const useOrderDraftStore = defineStore('orderDraft', () => {
       const lots = parseDecimalInput(raw)
       return { ...line, quantityUnits: unitsFromLots(lots, line.product.packFactor) }
     })
+    persistCustomer(customerId)
   }
 
   function setDiscount(customerId: string, productId: string, raw: string): void {
@@ -164,6 +219,7 @@ export const useOrderDraftStore = defineStore('orderDraft', () => {
       ...line,
       discountPercent: parseDecimalInput(raw),
     }))
+    persistCustomer(customerId)
   }
 
   function removeLine(customerId: string, productId: string): void {
@@ -171,6 +227,7 @@ export const useOrderDraftStore = defineStore('orderDraft', () => {
       customerId,
       linesOf(customerId).filter((line) => line.product.id !== productId),
     )
+    persistCustomer(customerId)
   }
 
   function viewOf(line: DraftLine): DraftLineView {
@@ -223,6 +280,7 @@ export const useOrderDraftStore = defineStore('orderDraft', () => {
     delete remainingKeys[customerId]
     linesByCustomer.value = remainingLines
     idempotencyKeyByCustomer.value = remainingKeys
+    persistCustomer(customerId)
   }
 
   function hasDraft(customerId: string): boolean {
@@ -235,6 +293,7 @@ export const useOrderDraftStore = defineStore('orderDraft', () => {
     const remainingKeys = { ...idempotencyKeyByCustomer.value }
     delete remainingKeys[customerId]
     idempotencyKeyByCustomer.value = remainingKeys
+    persistCustomer(customerId)
   }
 
   return {

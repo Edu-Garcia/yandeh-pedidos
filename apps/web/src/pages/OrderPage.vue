@@ -640,6 +640,13 @@ onUnmounted(() => {
       data-testid="order-totals"
       class="sticky bottom-0 z-10 border-t-4 border-counter bg-receipt px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3"
     >
+      <p
+        v-if="draft.hasDraft(customer.id)"
+        data-testid="draft-saved"
+        class="mb-2 font-sans text-sm text-produce"
+      >
+        Rascunho salvo
+      </p>
       <dl class="space-y-1">
         <div class="flex items-baseline justify-between gap-3">
           <dt class="font-sans text-sm text-steel">Bruto</dt>
