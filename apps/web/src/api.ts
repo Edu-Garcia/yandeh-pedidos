@@ -115,6 +115,74 @@ export function createOrder(
   })
 }
 
+/** Status persistidos: novos (T-14) + histórico do seed (Faturado/Cancelado). */
+export type CustomerOrderStatus =
+  'Enviado' | 'Aguardando aprovação' | 'Aprovado' | 'Rejeitado' | 'Faturado' | 'Cancelado'
+
+export interface CustomerOrderSummary {
+  id: string
+  /** Data civil `YYYY-MM-DD` (sem fuso). */
+  date: string
+  status: CustomerOrderStatus
+  /** Líquido em centavos, com preço e desconto congelados. */
+  total: number
+}
+
+export interface RepeatDraftLine {
+  productId: string
+  product: CustomerProduct
+  quantityUnits: number
+  discountPercent: number
+  lots: number | null
+}
+
+export interface RepeatRemovedItem {
+  productId: string
+  description: string | null
+  ean: string | null
+  reason: string
+}
+
+export type RepeatNotice =
+  | {
+      code: 'PACK_FACTOR_CHANGED'
+      productId: string
+      description: string | null
+      newFactor: number
+      lots: number
+      units: number
+      message: string
+    }
+  | {
+      code: 'LOT_NOT_EXACT'
+      productId: string
+      description: string | null
+      newFactor: number
+      lots: null
+      units: number
+      message: string
+    }
+
+export interface RepeatDraftResponse {
+  lines: RepeatDraftLine[]
+  removed: RepeatRemovedItem[]
+  notices: RepeatNotice[]
+}
+
+export function fetchCustomerOrders(customerId: string): Promise<CustomerOrderSummary[]> {
+  return apiRequest<CustomerOrderSummary[]>(`/customers/${customerId}/orders`)
+}
+
+/** Monta o rascunho para revisão. Não cria pedido (RN12). */
+export function repeatCustomerOrder(
+  customerId: string,
+  orderId: string,
+): Promise<RepeatDraftResponse> {
+  return apiRequest<RepeatDraftResponse>(`/customers/${customerId}/orders/${orderId}/repeat`, {
+    method: 'POST',
+  })
+}
+
 /** 403/404 da API: não revelar se o recurso existe (T-17). */
 export function isHiddenResourceError(error: unknown): boolean {
   return error instanceof ApiError && (error.status === 403 || error.status === 404)

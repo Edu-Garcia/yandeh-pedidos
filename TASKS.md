@@ -34,11 +34,11 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | F2 — Banco e seed                 | 1       | 1      |
 | F3 — API (req. 1–5, 7)            | 8       | 8      |
 | F4 — Telas (req. 1–5, 7)          | 5       | 5      |
-| F5 — Histórico e repetir (req. 8) | 2       | 1      |
+| F5 — Histórico e repetir (req. 8) | 2       | 2      |
 | F6 — Supervisor (fecha req. 5)    | 2       | 0      |
 | F7 — Offline parcial (req. 9)     | 2       | 0      |
 | F8 — Entrega e docs               | 4       | 0      |
-| **Total**                         | **34**  | **25** |
+| **Total**                         | **34**  | **26** |
 | Opcionais                         | 3       | 0      |
 
 > Sem estimativas de tempo: com IA acelerando a implementação, elas não refletem dados reais. Prioridade: núcleo (F1–F4 + F8, req. 1–7) primeiro. Se o prazo apertar, corte na ordem: opcionais → F7 → F6 (T-25) → F5, e registre em README "o que ficou de fora".
@@ -318,12 +318,13 @@ Validação comum: `pnpm --filter @yandeh/web typecheck && pnpm --filter @yandeh
 - **Commit:** `feat(api): histórico do cliente e montagem de repetir pedido`
 - **Status:** feito
 
-### [ ] T-23 — Web: histórico e "Repetir pedido"
+### [x] T-23 — Web: histórico e "Repetir pedido"
 
 - **Depende de:** T-22, T-21
 - **Aceite:** lista data, status, total; "Repetir" carrega o carrinho para revisão com aviso "P022 removido (inativo)"; descontos 0%; item cujo fator mudou: não só múltiplo vem com as mesmas unidades, Lote vazio e mensagem; só múltiplo vem com o lote arredondado para cima e a mensagem "A quantidade de unidades por lote mudou para 12; a quantidade foi ajustada para 3 lote(s) (36 unidades)"; nada é enviado sem clicar Enviar; confirma antes de sobrescrever rascunho existente.
 - **Validação manual:** Logar V01, abrir C001 e o histórico → PH001 com data 2026-09-15, status Faturado e total. Clicar "Repetir" → carrinho para revisão, aviso de P022 removido (inativo), P001 a R$ 26,90, P006 com 0%. Nada é enviado sem clicar Enviar; se já houver rascunho, confirma antes de sobrescrever. Item cujo fator mudou: não só múltiplo vem com as mesmas unidades, Lote vazio e mensagem; só múltiplo vem com lote arredondado para cima e "A quantidade de unidades por lote mudou para 12; a quantidade foi ajustada para 3 lote(s) (36 unidades)". Evidência: screenshots do histórico e do carrinho após repetir.
 - **Commit:** `feat(web): histórico do cliente com repetir pedido`
+- **Status:** feito
 
 ## F6 — Supervisor (fecha o fluxo do req. 5)
 

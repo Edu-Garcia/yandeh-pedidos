@@ -287,6 +287,37 @@ describe('order draft store', () => {
     expect(draft.draftIssues('C001', 380000).map((issue) => issue.code)).toEqual(['BELOW_MINIMUM'])
   })
 
+  it('loadRepeatDraft substitui as linhas e descarta a chave de idempotência', () => {
+    const draft = useOrderDraftStore()
+    draft.addProduct('C001', p001)
+    draft.setUnits('C001', 'P001', '10')
+    draft.setDiscount('C001', 'P001', '6')
+    const key = draft.ensureIdempotencyKey('C001')
+
+    draft.loadRepeatDraft('C001', [
+      { product: p006, quantityUnits: 40, discountPercent: 0 },
+      { product: p001, quantityUnits: 10, discountPercent: 0 },
+    ])
+
+    expect(draft.hasDraft('C001')).toBe(true)
+    expect(draft.linesOf('C001')).toHaveLength(2)
+    expect(draft.linesOf('C001')[0]?.product.id).toBe('P006')
+    expect(draft.linesOf('C001')[0]?.quantityUnits).toBe(40)
+    expect(draft.linesOf('C001')[0]?.discountPercent).toBe(0)
+    expect(draft.linesOf('C001')[1]?.product.unitPrice).toBe(2690)
+    expect(draft.ensureIdempotencyKey('C001')).not.toBe(key)
+    expect(localStorage.length).toBe(0)
+  })
+
+  it('hasDraft é falso sem linhas; clearDraft esvazia', () => {
+    const draft = useOrderDraftStore()
+    expect(draft.hasDraft('C001')).toBe(false)
+    draft.addProduct('C001', p001)
+    expect(draft.hasDraft('C001')).toBe(true)
+    draft.clearDraft('C001')
+    expect(draft.hasDraft('C001')).toBe(false)
+  })
+
   it('gera Idempotency-Key uma vez por rascunho e limpa após o envio', () => {
     const draft = useOrderDraftStore()
     draft.addProduct('C001', p001)
