@@ -61,7 +61,7 @@ Permitir que o vendedor monte e envie um pedido correto (preço da tabela do cli
 | 9   | Pedido sem conexão + sincronização                                | Opcional                                     | ⚠️ **Parcial (V1)** [Decisão do autor] |
 | —   | Tela simples do supervisor para aprovar/rejeitar                  | Extra necessário p/ fechar o fluxo do req. 5 | ✅ [Decisão do autor]                  |
 
-**Req. 9 — V1 parcial:** o rascunho do pedido é persistido localmente (localStorage/IndexedDB) e sobrevive a recarregar/perder sinal; o envio usa **retentativa com chave de idempotência** (`Idempotency-Key`), então reenviar nunca duplica pedido. Catálogo/preços offline completos e sincronização bidirecional ficam como trabalho futuro (tempo/complexidade), a refinar se sobrar tempo.
+**Req. 9 — V1 parcial:** o rascunho do pedido é persistido em **localStorage** (`yandeh.orderDraft`) e sobrevive a recarregar/perder sinal; o envio usa **retentativa com chave de idempotência** (`Idempotency-Key`), então reenviar nunca duplica pedido. Enquanto o envio está pendente, o rascunho fica travado para edição (a mesma chave não leva corpo diferente). IndexedDB, catálogo/preços offline completos e sincronização bidirecional ficam como trabalho futuro (T-34 / tempo/complexidade).
 
 ### 5.2 Fora do escopo
 
@@ -85,7 +85,7 @@ _Exemplo:_ C004 (Mercearia Dona Lúcia) não tem tabela → TP01. Trade-off acei
 
 ### RN03 — Produto vendável
 
-Vendável ⇔ `ativo = true` **e** existe preço na tabela efetiva do cliente. Inativos não aparecem na busca.
+Vendável ⇔ `ativo = true` **e** existe preço na tabela efetiva do cliente. Inativos não aparecem na busca. Preço **0 é válido** (não é ausência); `unitPriceFor` só devolve `null` quando o produto não está na tabela. Sem guards extras contra seed corrompido — o `seed.json` é usado como está [Decisão do autor].
 _Exemplo:_ P021 e P022 são inativos; TP03 não tem P021 (inativo de qualquer forma).
 
 ### RN04 — Busca [Enunciado + Decisão do autor]
@@ -165,7 +165,7 @@ _Exemplo:_ repetir PH001 (C001) → P022 é removido com aviso; P001 vem a R$ 26
 
 ### RN13 — Idempotência de envio [Req. 9 parcial]
 
-O front gera um UUID por rascunho e envia em `Idempotency-Key`. A API grava a chave (única); reenvio com a mesma chave retorna o pedido já criado (200) em vez de duplicar.
+O front gera um UUID por rascunho e envia em `Idempotency-Key`. A API grava a chave (única); reenvio com a mesma chave, o mesmo vendedor e o mesmo cliente retorna o pedido já criado (200) em vez de duplicar — **sem comparar o resto do corpo**. Mesma chave com outro vendedor ou cliente → 409 `IDEMPOTENCY_KEY_CONFLICT`. Por isso, rascunho **pendente de envio fica travado** para edição; não há cancelar pendente [Decisão do autor].
 
 ### Exemplo completo (C001 / V01 / TP01)
 
@@ -180,11 +180,11 @@ O front gera um UUID por rascunho e envia em `Idempotency-Key`. A API grava a ch
 
 ## 7. Fluxos e telas (mobile-first)
 
-1. **Quem é você?** — escolher V01/V02/V03 ou Supervisor S01 (login simulado).
-2. **Minha carteira** — clientes do vendedor com cidade/UF, tabela (badge "Padrão (fallback)" no C004) e crédito disponível (destaque quando insuficiente para o mínimo, ex.: C006, C010).
-3. **Pedido do cliente** — busca (nome/EAN; scanner fica fora), resultados com preço da tabela; carrinho com campos interligados Unidades e Lote (CX/FD; Unidades somente leitura quando só por lote), desconto %; painel fixo de totais; lista de bloqueios (mínimo, crédito, quantidade inválida) e aviso "precisará de aprovação"; botão **Enviar** desabilitado quando há bloqueio; indicador de rascunho salvo/offline.
-4. **Histórico do cliente** — últimos pedidos (data, status, total) e "Repetir pedido".
-5. **Aprovações (supervisor)** — lista de pendentes com vendedor, cliente, maior desconto vs alçada, total; Aprovar/Rejeitar.
+1. **Quem é você?** — escolher V01/V02/V03 ou Supervisor S01 (login simulado). Sem sessão, qualquer URL (existente ou não) redireciona para `/`. Com sessão, rota de outro papel ou URL inexistente mostra o mesmo 404 ("Página não encontrada") **sem mudar a URL** [Decisão do autor].
+2. **Minha carteira** — clientes do vendedor com cidade/UF, **nome da tabela** efetiva (não o id `TP01`; badge "Padrão (fallback)" no C004) e crédito disponível (destaque quando insuficiente para o mínimo, ex.: C006, C010).
+3. **Pedido do cliente** — busca (nome/EAN; scanner fica fora), resultados com **descrição, EAN e preço** (a UI nunca mostra o id do produto); carrinho com campos interligados Unidades e Lote (CX/FD; Unidades somente leitura quando só por lote), desconto %; painel fixo de totais; lista de bloqueios (mínimo, crédito, quantidade inválida) e aviso "precisará de aprovação"; botão **Enviar** desabilitado quando há bloqueio; indicador de rascunho salvo/offline; rascunho pendente de envio **travado** para edição.
+4. **Histórico do cliente** — últimos pedidos (data, status, total) e "Repetir pedido". Avisos de item removido usam a **descrição**, nunca o id do produto.
+5. **Aprovações (supervisor)** — lista de pendentes com vendedor, cliente, maior desconto vs alçada, total; **Aprovar/Rejeitar com confirmação inline** (ações definitivas) [Decisão do autor].
 
 ## 8. API (esboço)
 
@@ -201,7 +201,9 @@ O front gera um UUID por rascunho e envia em `Idempotency-Key`. A API grava a ch
 | GET    | `/supervisor/orders?status=Aguardando aprovação`    | Pendentes                                        |
 | POST   | `/supervisor/orders/:id/approve` · `/reject`        | Decisão                                          |
 
-Identidade simulada por header: `X-Seller-Id` nas rotas do vendedor e `X-Supervisor-Id` nas rotas `/supervisor/*` **[Decisão do autor]**.
+Identidade simulada por header: `X-Seller-Id` nas rotas do vendedor e `X-Supervisor-Id` nas rotas `/supervisor/*` **[Decisão do autor]**. Header inválido ou supervisor inexistente em `/supervisor/*` → o **mesmo 404 genérico do Fastify** para rota desconhecida (não revela que a rota existe) [Decisão do autor].
+
+`pedidos.data` é a data civil no fuso do negócio (`BUSINESS_TIMEZONE`, default `America/Fortaleza`), não a fatia UTC de `toISOString()` [Decisão do autor].
 
 Erros de regra: `422` com lista de `ValidationIssue` (mesmos códigos do `@yandeh/shared`) **[Decisão do autor]**:
 
@@ -218,7 +220,7 @@ A alçada **não** é erro: acima dela o pedido vai para "Aguardando aprovação
 
 ## 9. Modelo de dados (esboço — Drizzle/PostgreSQL)
 
-`supervisores`, `vendedores`, `tabelas_preco`, `tabelas_preco_itens (tabela, produto, preco_unidade_centavos)`, `clientes (… limite_credito_centavos, credito_utilizado_centavos, tabela_preco_id NULL)`, `produtos (ean NÃO único)`, `pedidos (status, idempotency_key UNIQUE)`, `pedidos_itens (quantidade em unidades, preco_unidade_centavos congelado, desconto_percentual)`. Histórico do seed entra em `pedidos`. Ver `apps/api/src/db/schema.ts`.
+`supervisores`, `vendedores`, `tabelas_preco`, `tabelas_preco_itens (tabela, produto, preco_unidade_centavos)`, `clientes (… limite_credito_centavos, credito_utilizado_centavos, tabela_preco_id NULL)`, `produtos (ean NÃO único)`, `pedidos (status, data civil no fuso do negócio, idempotency_key UNIQUE)`, `pedidos_itens (quantidade em unidades, preco_unidade_centavos congelado, desconto_percentual)`. Histórico do seed entra em `pedidos`. Ver `apps/api/src/db/schema.ts`.
 
 ## 10. Requisitos não funcionais
 
