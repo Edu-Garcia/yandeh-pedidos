@@ -10,6 +10,8 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { buildApp } from './app.js'
 import { db, pool } from './db/client.js'
 import { clientes, pedidos, pedidosItens, produtos, supervisores } from './db/schema.js'
+import { databaseNameFromUrl, resolveTestDatabaseUrl } from './db/test-database-url.js'
+import { resetTestData } from './test/reset-test-data.js'
 
 const SEED_ORDER_IDS = ['PH001', 'PH002', 'PH003', 'PH004']
 
@@ -169,8 +171,21 @@ async function resetOrdersAndCredit() {
   await restoreSeedCreditUsed()
 }
 
+beforeEach(async () => {
+  await resetTestData(db)
+})
+
 afterAll(async () => {
   await pool.end()
+})
+
+describe('banco de teste isolado', () => {
+  it('não usa o banco de desenvolvimento', async () => {
+    const { rows } = await pool.query<{ current_database: string }>('select current_database()')
+    const name = rows[0]?.current_database
+    expect(name).toBe(databaseNameFromUrl(resolveTestDatabaseUrl()))
+    expect(name).not.toBe('yandeh')
+  })
 })
 
 describe('GET /health', () => {

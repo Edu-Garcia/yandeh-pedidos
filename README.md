@@ -3,7 +3,7 @@
 Módulo de montagem de pedidos para vendedores externos. Requisitos e regras: [`PRD.md`](PRD.md).
 Decisões: [`DECISIONS.md`](DECISIONS.md) · Assunções: [`ASSUMPTIONS.md`](ASSUMPTIONS.md) · Uso de IA: [`AI_LOG.md`](AI_LOG.md) · Plano de tarefas: [`TASKS.md`](TASKS.md).
 
-> **Status:** F0–F7, T-28 (README), T-29 (`DECISIONS.md`) e T-30 (`AI_LOG.md`) concluídas (req. 1–8 e V1 do req. 9: rascunho local + reenvio idempotente). Falta T-31 (verificação a partir de clone limpo). Opcionais T-32–T-34 não feitos.
+> **Status:** Tarefas obrigatórias T-00–T-31 concluídas (F0–F8; req. 1–8 e V1 do req. 9: rascunho local + reenvio idempotente). Opcionais T-32–T-34 não feitos.
 >
 > O desafio foi entregue ao recrutador em 26/10/2026 com o repositório incompleto. O estado no prazo é o commit [`af003cc`](https://github.com/Edu-Garcia/yandeh-pedidos/tree/af003cc9b2f8b06639fb757cd27388568e8a2c51) (merge do PR #25, T-22): no `TASKS.md` daquele commit, T-00–T-22 estavam `[x]` (F0–F4 e a API de histórico/repetir; 25 de 34). Depois do prazo: tela de histórico (T-23), supervisor (T-24/T-25) e offline parcial V1 (T-26/T-27).
 
@@ -40,13 +40,12 @@ cp .env.example .env
 pnpm install
 docker compose up -d postgres
 pnpm --filter @yandeh/api db:setup   # migra + seed
-pnpm --filter @yandeh/shared build
 pnpm dev                              # api (3333) + web (5173)
 ```
 
-`@yandeh/shared` exporta `dist/`: o build acima é obrigatório antes de `pnpm dev` e de typecheck/testes da API e da web.
+`@yandeh/shared` exporta `dist/`. Os scripts de raiz `pnpm dev`, `pnpm test` e `pnpm typecheck` compilam o shared antes (em clone limpo, `pnpm typecheck`/`pnpm test` falhavam sem o `dist/`). `pnpm --filter @yandeh/shared build` continua disponível se precisar do `dist/` isolado.
 
-Variáveis da API (ver `.env.example`, `apps/api/src/env.ts` e `docker-compose.yml`): `DATABASE_URL`, `API_PORT`, `HOST` (default `0.0.0.0`; não está no `.env.example`), `BUSINESS_TIMEZONE` (fuso da data civil do pedido; default `America/Fortaleza`).
+Variáveis da API (ver `.env.example`, `apps/api/src/env.ts` e `docker-compose.yml`): `DATABASE_URL`, `TEST_DATABASE_URL` (só nos testes; default = `DATABASE_URL` com sufixo `_test`), `API_PORT`, `HOST` (default `0.0.0.0`), `BUSINESS_TIMEZONE` (fuso da data civil do pedido; default `America/Fortaleza`).
 
 ### Usuários de teste (login simulado)
 
@@ -63,18 +62,19 @@ Exemplo do PRD (V01 / C001 / TP01): P001 10 un 0%, P006 40 un 2%, P010 24 un 0% 
 
 ## Como testar
 
-Os testes da API usam o Postgres em `DATABASE_URL` (default `postgres://yandeh:yandeh@localhost:5432/yandeh`) com o seed aplicado. Suba o banco antes (`docker compose up -d postgres` ou o stack completo). Se o banco estiver vazio: `pnpm --filter @yandeh/api db:setup`. Shared e web não precisam do banco.
+Os testes da API usam um **banco isolado**, derivado de `DATABASE_URL` com sufixo `_test` (default `postgres://yandeh:yandeh@localhost:5432/yandeh_test`). O `globalSetup` do Vitest cria o banco se não existir, aplica as migrações e faz `TRUNCATE` + seed antes da suíte; cada teste da API reseeda de novo. O banco de desenvolvimento (`yandeh`) não é lido nem escrito — pedidos criados pelo app (R1–R9, Docker ou `pnpm dev`) continuam lá. Vale no fluxo Docker do README, no Postgres local e se houver CI. Suba o Postgres antes (`docker compose up -d postgres` ou o stack completo). Para apontar para outro banco: `TEST_DATABASE_URL`. Shared e web não precisam do banco.
 
 ```bash
 pnpm install
-pnpm --filter @yandeh/shared build
 pnpm test
 pnpm typecheck
 pnpm lint
 pnpm format:check
 ```
 
-`pnpm test` é `pnpm -r test` (Vitest em cada pacote). O que cada suíte cobre:
+`pnpm test` e `pnpm typecheck` compilam `@yandeh/shared` antes, então o pipeline acima funciona num clone limpo (sem passo extra de `pnpm --filter @yandeh/shared build`).
+
+`pnpm test` compila o shared e em seguida roda `pnpm -r test` (Vitest em cada pacote). O que cada suíte cobre:
 
 ### `packages/shared` — regras puras (números do seed, sem I/O)
 
@@ -93,7 +93,7 @@ Arquivos em `packages/shared/src/*.test.ts`:
 - `business-date` — data civil em `America/Fortaleza` (não UTC)
 - `rules` — constantes (mínimo 30.000, fallback TP01)
 
-### `apps/api` — rotas com `app.inject` (precisa do Postgres com seed)
+### `apps/api` — rotas com `app.inject` (Postgres `yandeh_test`, seed automático)
 
 - `GET /health`, `/sellers` (V01/V02/V03), `/supervisors` (S01)
 - Carteira `GET /sellers/:id/customers` (crédito, fallback; outro vendedor = mesmo 404 de inexistente; sem header 400)
