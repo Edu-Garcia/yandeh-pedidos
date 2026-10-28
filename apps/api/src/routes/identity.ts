@@ -12,9 +12,13 @@ import { pendingNetsByCustomer } from '../db/pending-credit.js'
 import { clientes, supervisores, tabelasPreco, vendedores } from '../db/schema.js'
 import {
   sellerCustomersResponseSchema,
+  sellerIdHeaderSchema,
   sellersResponseSchema,
   supervisorsResponseSchema,
 } from '../http/schemas.js'
+
+/** Mesmo 404 para vendedor inexistente e para carteira de outro vendedor (D14). */
+const SELLER_NOT_FOUND = { message: 'Vendedor não encontrado' } as const
 
 export function registerIdentityRoutes(app: FastifyInstance, database: Db) {
   app.get('/sellers', async () => {
@@ -44,7 +48,15 @@ export function registerIdentityRoutes(app: FastifyInstance, database: Db) {
   })
 
   app.get<{ Params: { id: string } }>('/sellers/:id/customers', async (request, reply) => {
+    const callerId = sellerIdHeaderSchema.safeParse(request.headers['x-seller-id'])
+    if (!callerId.success) {
+      return reply.code(400).send({ message: 'Cabeçalho X-Seller-Id é obrigatório' })
+    }
+
     const sellerId = request.params.id
+    if (callerId.data !== sellerId) {
+      return reply.code(404).send(SELLER_NOT_FOUND)
+    }
 
     const [seller] = await database
       .select({ id: vendedores.id })
@@ -53,7 +65,7 @@ export function registerIdentityRoutes(app: FastifyInstance, database: Db) {
       .limit(1)
 
     if (!seller) {
-      return reply.code(404).send({ message: 'Vendedor não encontrado' })
+      return reply.code(404).send(SELLER_NOT_FOUND)
     }
 
     const fallbackTable = alias(tabelasPreco, 'tabela_fallback')

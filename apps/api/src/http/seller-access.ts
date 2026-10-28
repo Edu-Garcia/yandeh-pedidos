@@ -11,12 +11,14 @@ export type SellerWalletCustomer = {
 }
 
 export type SellerWalletResult =
-  | { ok: true; customer: SellerWalletCustomer }
-  | { ok: false; statusCode: 403 | 404; message: string }
+  { ok: true; customer: SellerWalletCustomer } | { ok: false; statusCode: 404; message: string }
+
+/** Mesmo 404 para cliente inexistente e para cliente de outra carteira (D14). */
+export const CUSTOMER_NOT_FOUND = { message: 'Cliente não encontrado' } as const
 
 /**
- * RN01 / T-13: cliente existe e pertence à carteira do vendedor do header.
- * 404 se o cliente não existe; 403 se é de outra carteira.
+ * RN01 / D14: cliente existe e pertence à carteira do vendedor do header.
+ * Fora da carteira é indistinguível de inexistente — mesmo 404 e mesmo corpo.
  */
 export async function findCustomerInSellerWallet(
   database: Db,
@@ -35,12 +37,8 @@ export async function findCustomerInSellerWallet(
     .where(eq(clientes.id, customerId))
     .limit(1)
 
-  if (!customer) {
-    return { ok: false, statusCode: 404, message: 'Cliente não encontrado' }
-  }
-
-  if (customer.sellerId !== sellerId) {
-    return { ok: false, statusCode: 403, message: 'Cliente não pertence à carteira do vendedor' }
+  if (!customer || customer.sellerId !== sellerId) {
+    return { ok: false, statusCode: 404, message: CUSTOMER_NOT_FOUND.message }
   }
 
   return { ok: true, customer }

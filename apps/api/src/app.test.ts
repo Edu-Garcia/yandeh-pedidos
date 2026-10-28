@@ -225,7 +225,11 @@ describe('GET /supervisors', () => {
 describe('GET /sellers/:id/customers', () => {
   it('V01 retorna exatamente C001–C004 com tabela efetiva e crédito disponível', async () => {
     const app = buildApp(db)
-    const res = await app.inject({ method: 'GET', url: '/sellers/V01/customers' })
+    const res = await app.inject({
+      method: 'GET',
+      url: '/sellers/V01/customers',
+      headers: { 'x-seller-id': 'V01' },
+    })
     expect(res.statusCode).toBe(200)
     expect(res.json()).toEqual([
       {
@@ -272,11 +276,30 @@ describe('GET /sellers/:id/customers', () => {
     await app.close()
   })
 
-  it('vendedor inexistente retorna 404', async () => {
+  it('carteira de outro vendedor retorna o mesmo 404 de vendedor inexistente', async () => {
     const app = buildApp(db)
-    const res = await app.inject({ method: 'GET', url: '/sellers/V99/customers' })
-    expect(res.statusCode).toBe(404)
-    expect(res.json()).toEqual({ message: 'Vendedor não encontrado' })
+    const otherSeller = await app.inject({
+      method: 'GET',
+      url: '/sellers/V02/customers',
+      headers: { 'x-seller-id': 'V01' },
+    })
+    const missing = await app.inject({
+      method: 'GET',
+      url: '/sellers/V99/customers',
+      headers: { 'x-seller-id': 'V01' },
+    })
+    expect(missing.statusCode).toBe(404)
+    expect(missing.json()).toEqual({ message: 'Vendedor não encontrado' })
+    expect(otherSeller.statusCode).toBe(missing.statusCode)
+    expect(otherSeller.json()).toEqual(missing.json())
+    await app.close()
+  })
+
+  it('sem X-Seller-Id retorna 400', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({ method: 'GET', url: '/sellers/V01/customers' })
+    expect(res.statusCode).toBe(400)
+    expect(res.json()).toEqual({ message: 'Cabeçalho X-Seller-Id é obrigatório' })
     await app.close()
   })
 })
@@ -340,15 +363,22 @@ describe('GET /customers/:id/products', () => {
     await app.close()
   })
 
-  it('cliente de outra carteira retorna 403', async () => {
+  it('cliente de outra carteira retorna o mesmo 404 de cliente inexistente', async () => {
     const app = buildApp(db)
-    const res = await app.inject({
+    const otherWallet = await app.inject({
       method: 'GET',
       url: '/customers/C005/products?q=arroz',
       headers: { 'x-seller-id': 'V01' },
     })
-    expect(res.statusCode).toBe(403)
-    expect(res.json()).toEqual({ message: 'Cliente não pertence à carteira do vendedor' })
+    const missing = await app.inject({
+      method: 'GET',
+      url: '/customers/C999/products?q=arroz',
+      headers: { 'x-seller-id': 'V01' },
+    })
+    expect(missing.statusCode).toBe(404)
+    expect(missing.json()).toEqual({ message: 'Cliente não encontrado' })
+    expect(otherWallet.statusCode).toBe(missing.statusCode)
+    expect(otherWallet.json()).toEqual(missing.json())
     await app.close()
   })
 })
@@ -561,7 +591,11 @@ describe('POST /orders', () => {
       .where(eq(clientes.id, 'C002'))
     expect(c002?.creditUsed).toBe(SEED_CREDIT_USED.C002)
 
-    const wallet = await app.inject({ method: 'GET', url: '/sellers/V01/customers' })
+    const wallet = await app.inject({
+      method: 'GET',
+      url: '/sellers/V01/customers',
+      headers: { 'x-seller-id': 'V01' },
+    })
     expect(wallet.statusCode).toBe(200)
     const customers = wallet.json() as Array<{ id: string; availableCredit: number }>
     expect(customers.find((customer) => customer.id === 'C002')?.availableCredit).toBe(3000)
@@ -609,21 +643,29 @@ describe('POST /orders', () => {
     await app.close()
   })
 
-  it('V01 pedindo para C005 retorna 403', async () => {
+  it('V01 pedindo para C005 retorna o mesmo 404 de cliente inexistente', async () => {
     const app = buildApp(db)
-    const res = await app.inject({
+    const headers = {
+      'x-seller-id': 'V01',
+      'content-type': 'application/json',
+    }
+    const otherWallet = await app.inject({
       method: 'POST',
       url: '/orders',
-      headers: {
-        'x-seller-id': 'V01',
-        'content-type': 'application/json',
-        'idempotency-key': randomUUID(),
-      },
+      headers: { ...headers, 'idempotency-key': randomUUID() },
       payload: { customerId: 'C005', items: exampleC001Items },
     })
+    const missing = await app.inject({
+      method: 'POST',
+      url: '/orders',
+      headers: { ...headers, 'idempotency-key': randomUUID() },
+      payload: { customerId: 'C999', items: exampleC001Items },
+    })
 
-    expect(res.statusCode).toBe(403)
-    expect(res.json()).toEqual({ message: 'Cliente não pertence à carteira do vendedor' })
+    expect(missing.statusCode).toBe(404)
+    expect(missing.json()).toEqual({ message: 'Cliente não encontrado' })
+    expect(otherWallet.statusCode).toBe(missing.statusCode)
+    expect(otherWallet.json()).toEqual(missing.json())
     await app.close()
   })
 
@@ -886,15 +928,22 @@ describe('GET /customers/:id/orders', () => {
     await app.close()
   })
 
-  it('cliente de outra carteira retorna 403', async () => {
+  it('cliente de outra carteira retorna o mesmo 404 de cliente inexistente', async () => {
     const app = buildApp(db)
-    const res = await app.inject({
+    const otherWallet = await app.inject({
       method: 'GET',
       url: '/customers/C005/orders',
       headers: { 'x-seller-id': 'V01' },
     })
-    expect(res.statusCode).toBe(403)
-    expect(res.json()).toEqual({ message: 'Cliente não pertence à carteira do vendedor' })
+    const missing = await app.inject({
+      method: 'GET',
+      url: '/customers/C999/orders',
+      headers: { 'x-seller-id': 'V01' },
+    })
+    expect(missing.statusCode).toBe(404)
+    expect(missing.json()).toEqual({ message: 'Cliente não encontrado' })
+    expect(otherWallet.statusCode).toBe(missing.statusCode)
+    expect(otherWallet.json()).toEqual(missing.json())
     await app.close()
   })
 
@@ -1121,15 +1170,22 @@ describe('POST /customers/:id/orders/:orderId/repeat', () => {
     await app.close()
   })
 
-  it('cliente de outra carteira retorna 403', async () => {
+  it('cliente de outra carteira retorna o mesmo 404 de cliente inexistente', async () => {
     const app = buildApp(db)
-    const res = await app.inject({
+    const otherWallet = await app.inject({
       method: 'POST',
       url: '/customers/C005/orders/PH003/repeat',
       headers: { 'x-seller-id': 'V01' },
     })
-    expect(res.statusCode).toBe(403)
-    expect(res.json()).toEqual({ message: 'Cliente não pertence à carteira do vendedor' })
+    const missing = await app.inject({
+      method: 'POST',
+      url: '/customers/C999/orders/PH001/repeat',
+      headers: { 'x-seller-id': 'V01' },
+    })
+    expect(missing.statusCode).toBe(404)
+    expect(missing.json()).toEqual({ message: 'Cliente não encontrado' })
+    expect(otherWallet.statusCode).toBe(missing.statusCode)
+    expect(otherWallet.json()).toEqual(missing.json())
     await app.close()
   })
 
@@ -1216,7 +1272,11 @@ async function createPendingC002(app: ReturnType<typeof buildApp>) {
 }
 
 async function availableCreditOf(app: ReturnType<typeof buildApp>, customerId: string) {
-  const wallet = await app.inject({ method: 'GET', url: '/sellers/V01/customers' })
+  const wallet = await app.inject({
+    method: 'GET',
+    url: '/sellers/V01/customers',
+    headers: { 'x-seller-id': 'V01' },
+  })
   expect(wallet.statusCode).toBe(200)
   const customers = wallet.json() as Array<{ id: string; availableCredit: number }>
   return customers.find((customer) => customer.id === customerId)?.availableCredit

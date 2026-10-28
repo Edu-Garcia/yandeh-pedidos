@@ -73,7 +73,7 @@ Todas implementadas como **funções puras** em `packages/shared` (usadas pelo f
 
 ### RN01 — Carteira [Enunciado]
 
-Vendedor `V` só lista/usa clientes com `cliente.vendedor_id = V`. A API rejeita (403/404) pedido para cliente de outra carteira.
+Vendedor `V` só lista/usa clientes com `cliente.vendedor_id = V`. A API responde o mesmo 404 de cliente inexistente (`Cliente não encontrado`) para cliente de outra carteira — não vaza que o id existe [D14].
 _Exemplo:_ V01 vê C001–C004; V02 vê C005–C007; V03 vê C008–C010.
 
 ### RN02 — Tabela de preço efetiva [Decisão do autor]
@@ -201,7 +201,7 @@ O front gera um UUID por rascunho e envia em `Idempotency-Key`. A API grava a ch
 | GET    | `/supervisor/orders?status=Aguardando aprovação`    | Pendentes                                        |
 | POST   | `/supervisor/orders/:id/approve` · `/reject`        | Decisão                                          |
 
-Identidade simulada por header: `X-Seller-Id` nas rotas do vendedor e `X-Supervisor-Id` nas rotas `/supervisor/*` **[Decisão do autor]**. Header inválido ou supervisor inexistente em `/supervisor/*` → o **mesmo 404 genérico do Fastify** para rota desconhecida (não revela que a rota existe) [Decisão do autor].
+Identidade simulada por header: `X-Seller-Id` nas rotas do vendedor e `X-Supervisor-Id` nas rotas `/supervisor/*` **[Decisão do autor]**. Header inválido ou supervisor inexistente em `/supervisor/*` → o **mesmo 404 genérico do Fastify** para rota desconhecida (não revela que a rota existe) [Decisão do autor]. Cliente inexistente ou de outra carteira → 404 `{ message: 'Cliente não encontrado' }` (indistinguíveis) [D14]. `GET /sellers/:id/customers` exige `X-Seller-Id`; ausente → 400; `:id` diferente do header ou vendedor inexistente → 404 `{ message: 'Vendedor não encontrado' }` (indistinguíveis) [D14].
 
 `pedidos.data` é a data civil no fuso do negócio (`BUSINESS_TIMEZONE`, default `America/Fortaleza`), não a fatia UTC de `toISOString()` [Decisão do autor].
 
