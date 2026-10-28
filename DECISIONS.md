@@ -113,9 +113,14 @@ Decisões marcadas **[autor]** foram tomadas pelo candidato (com os motivos dele
 
 - **Contexto:** login é simulado (A1); a Web e a API precisam tratar URL inexistente, papel errado e recurso alheio sem ensinar quais rotas ou ids existem.
 - **Alternativas:** 403 explícito em todo lugar; redirecionar para a home do papel; 404 só em URL inexistente e 403 nas demais.
-- **Escolha:** na Web, rota de outro papel, URL inexistente e 403/404 da API renderizam a mesma `NotFoundPage` ("Página não encontrada") **sem mudar a URL** (`apps/web/src/router/index.ts`, `isHiddenResourceError` em `apps/web/src/api.ts`). Sem sessão, qualquer URL que não seja `/` redireciona para a seleção — também para não vazar o mapa de rotas (T-17). Na API, supervisor inválido/inexistente ou header ausente em `/supervisor/*` recebe o **mesmo 404 genérico do Fastify** para rota desconhecida (`reply.callNotFound()` em `apps/api/src/routes/supervisor.ts`). Pedido de outro cliente ou de outro time → 404 `Pedido não encontrado`, igual a inexistente (A33, A41). Cliente de outra carteira continua **403** na API (RN01 / T-13); a Web mascara esse 403 como o mesmo 404.
-- **Por quê:** não revelar quais URLs e recursos existem. O 403 da carteira na API permanece para o contrato das tarefas T-13/T-14; o replay da `Idempotency-Key` só roda depois da carteira, para um 409 não vazar que a chave existe (T-16).
-- **Com mais tempo:** autenticação real (fora do PRD §5.2) substituiria o mascaramento por sessão e papéis de verdade. O 403 da carteira na API e o 404 da Web poderiam então convergir sem o header simulado.
+- **Escolha:** na Web, rota de outro papel, URL inexistente e 403/404 da API renderizam a mesma `NotFoundPage` ("Página não encontrada") **sem mudar a URL** (`apps/web/src/router/index.ts`, `isHiddenResourceError` em `apps/web/src/api.ts`). Sem sessão, qualquer URL que não seja `/` redireciona para a seleção — também para não vazar o mapa de rotas (T-17). Na API:
+  - supervisor inválido/inexistente ou header ausente em `/supervisor/*` → o **mesmo 404 genérico do Fastify** para rota desconhecida (`reply.callNotFound()`);
+  - vendedor acessando `/supervisor/*` (sem `X-Supervisor-Id` válido) → o mesmo 404 de rota inexistente; não há 403 por papel;
+  - pedido de outro cliente ou de outro time → 404 `Pedido não encontrado`, igual a inexistente (A33, A41);
+  - cliente de outra carteira → o **mesmo 404** `{ message: 'Cliente não encontrado' }` de cliente inexistente (`findCustomerInSellerWallet`), em `GET /customers/:id/products`, `GET /customers/:id/orders`, `POST /customers/:id/orders/:orderId/repeat` e `POST /orders`;
+  - `GET /sellers/:id/customers` com `X-Seller-Id` diferente do `:id` → o **mesmo 404** `{ message: 'Vendedor não encontrado' }` de vendedor inexistente. Header ausente continua **400** (igual às outras rotas do vendedor; não distingue se o `:id` existe).
+- **Por quê:** não revelar quais URLs e recursos existem. Um 403 de carteira ensinaria que o id do cliente existe na carteira de outro vendedor. O replay da `Idempotency-Key` só roda depois da carteira, para um 409 não vazar que a chave existe (T-16).
+- **Com mais tempo:** autenticação real (fora do PRD §5.2) substituiria o mascaramento por sessão e papéis de verdade.
 
 ## D15 — Preço zero é preço válido; seed usado como está [autor]
 

@@ -96,10 +96,10 @@ Arquivos em `packages/shared/src/*.test.ts`:
 ### `apps/api` — rotas com `app.inject` (precisa do Postgres com seed)
 
 - `GET /health`, `/sellers` (V01/V02/V03), `/supervisors` (S01)
-- Carteira `GET /sellers/:id/customers` (crédito, fallback, 404)
-- Busca `GET /customers/:id/products?q=` (nome/EAN, só vendáveis, 403 de outra carteira)
-- `POST /orders` — Zod + `validateOrder`; exemplo C001 → 201 Enviado 51.930; alçada → Aguardando aprovação; 422 de regra; crédito com `FOR UPDATE` e corrida; `Idempotency-Key` (reenvio 200, sem header 400); data civil no fuso do negócio
-- Histórico `GET /customers/:id/orders` e `POST .../repeat` (não cria pedido; PH004 Cancelado; 403/404)
+- Carteira `GET /sellers/:id/customers` (crédito, fallback; outro vendedor = mesmo 404 de inexistente; sem header 400)
+- Busca `GET /customers/:id/products?q=` (nome/EAN, só vendáveis; outra carteira = mesmo 404 de inexistente)
+- `POST /orders` — Zod + `validateOrder`; exemplo C001 → 201 Enviado 51.930; alçada → Aguardando aprovação; 422 de regra; crédito com `FOR UPDATE` e corrida; `Idempotency-Key` (reenvio 200, sem header 400); data civil no fuso do negócio; outra carteira = mesmo 404 de inexistente
+- Histórico `GET /customers/:id/orders` e `POST .../repeat` (não cria pedido; PH004 Cancelado; outra carteira = mesmo 404 de inexistente)
 - Supervisor `GET /supervisor/orders` e `POST .../approve|reject` (reserva ↔ utilizado, 409, 422 de crédito)
 - `shared-runtime` — import ESM de `lineTotals` em runtime
 
