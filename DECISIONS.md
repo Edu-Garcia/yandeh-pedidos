@@ -11,7 +11,7 @@ Decisões marcadas **[autor]** foram tomadas pelo candidato (com os motivos dele
 - **Alternativas:** outra stack (exigiria justificativa).
 - **Escolha:** Vue 3, Node.js + TypeScript, PostgreSQL.
 - **Por quê:** é a stack recomendada e usada pelo time; reduz atrito na avaliação e na conversa.
-- **Com mais tempo:** não trocaria a stack. O ganho estaria no que ficou de fora: e2e do fluxo feliz (T-32), testes de componente do carrinho (T-33) e a verificação a partir de clone limpo (T-31).
+- **Com mais tempo:** não trocaria a stack. O e2e Playwright (T-32) e a verificação a partir de clone limpo (T-31) já existem; o ganho que restou é o teste de componente do carrinho (T-33).
 
 ## D2 — Backend: Fastify [autor]
 
@@ -19,7 +19,7 @@ Decisões marcadas **[autor]** foram tomadas pelo candidato (com os motivos dele
 - **Alternativas:** Express (tipagem fraca, erros assíncronos tratados manualmente); NestJS (boilerplate e "mágica" de DI/decorators difícil de explicar ao vivo).
 - **Escolha:** Fastify + Zod.
 - **Por quê:** rápido e flexível; validação por schema e boa tipagem (Zod/TypeBox) facilitam testes (`app.inject`) e estrutura. Express/NestJS são mais pesados/complexos sem necessidade para o escopo.
-- **Com mais tempo:** manteria Fastify + Zod. O que faltou não é outro framework: é o roteiro R1–R9 num clone limpo (T-31) e um e2e que exercite as rotas no browser (T-32).
+- **Com mais tempo:** manteria Fastify + Zod. O roteiro R1–R9 no clone limpo (T-31) e o e2e no browser (T-32) já existem; o que acrescentaria é um workflow de CI rodando os dois.
 
 ## D3 — Acesso a dados: Drizzle ORM + drizzle-kit [autor]
 
@@ -35,7 +35,7 @@ Decisões marcadas **[autor]** foram tomadas pelo candidato (com os motivos dele
 - **Alternativas:** PrimeVue (visual genérico de admin); Vuetify (pesado e opinativo).
 - **Escolha:** Tailwind CSS v4.
 - **Por quê:** liberdade visual total, layout livre, combina com a skill `frontend-design`.
-- **Com mais tempo:** manteria Tailwind. Fecharia os testes de componente do carrinho (T-33) e um e2e do fluxo feliz (T-32); a direção visual já atende o viewport de ~390 px das tarefas F4–F7.
+- **Com mais tempo:** manteria Tailwind. O e2e (T-32) já exercita o viewport de 390 px; fecharia os testes de componente do carrinho (T-33).
 
 ## D5 — Monorepo pnpm com `packages/shared` para regras de negócio [autor]
 
@@ -160,7 +160,7 @@ Decisões marcadas **[autor]** foram tomadas pelo candidato (com os motivos dele
 - **Alternativas:** commits grandes por fase; squash no merge; várias tarefas no mesmo PR.
 - **Escolha:** tarefas de escopo fechado em `TASKS.md` (uma por commit, Conventional Commits, trailer `IA:`). PR com testes e validação manual colada. Merge **sem squash**. Problemas encontrados numa tarefa se resolvem nela.
 - **Por quê:** mudanças pequenas e explicáveis; o `git log` mostra a evolução (F1 regras → F3 API → F4 telas → F8 docs) e a linha `IA:` em cada commit.
-- **Com mais tempo:** T-31 (clone limpo + roteiro R1–R9) e os opcionais T-32–T-34. O processo em si não mudaria.
+- **Com mais tempo:** T-31 e T-32 já existem; restam os opcionais T-33 e T-34. O processo em si não mudaria.
 
 ## D20 — Data civil do pedido no fuso do negócio [autor]
 
@@ -176,4 +176,12 @@ Decisões marcadas **[autor]** foram tomadas pelo candidato (com os motivos dele
 - **Alternativas:** schema `test` no mesmo banco; `TEMPLATE yandeh` (copiaria o estado sujo); truncate+seed no banco de dev (apagaria pedidos reais); exigir seed limpo na documentação.
 - **Escolha:** `DATABASE_URL` com sufixo `_test` (default `yandeh_test`), ou `TEST_DATABASE_URL`. O `globalSetup` do Vitest cria o banco se não existir (conexão em `postgres`, fallback no banco de dev), migra e faz `TRUNCATE … CASCADE` + seed. Cada teste da API reseeda. Não usa `TEMPLATE` do banco de dev. `fileParallelism: false` e `maxWorkers: 1`.
 - **Por quê:** é o caminho mais simples que deixa o banco de dev intacto, funciona no Docker do README, no fluxo local e se houver CI, e a suíte passa em qualquer ordem e repetidamente.
-- **Com mais tempo:** um Postgres só de CI no workflow; containers de teste efêmeros. Para o desafio, um segundo banco no mesmo Postgres basta.
+- **Com mais tempo:** um Postgres só de CI no workflow; containers de teste efêmeros. Para o desafio, um segundo banco no mesmo Postgres basta. Os e2e seguem o mesmo padrão num terceiro banco `yandeh_e2e` (D22).
+
+## D22 — e2e Playwright em banco e portas próprios [autor]
+
+- **Contexto:** a T-32 pede o roteiro R1–R9 no browser, sem depender do estado do banco de dev (D21) e sem colocar Playwright no `pnpm test` (browsers). `docker compose` / `pnpm dev` já ocupam 5173/3333/`yandeh`.
+- **Alternativas:** reusar `yandeh_test` (colidiria com `pnpm test` em paralelo); apontar o e2e para 5173/3333 (pegaria a API de dev, suja); subir o stack Docker só para o e2e (mais lento e acoplado ao volume `pgdata`); instalar Firefox/WebKit além do Chromium.
+- **Escolha:** banco `yandeh_e2e` (ou `E2E_DATABASE_URL`), criado/migrado no `globalSetup` e reseedado a cada teste — o mesmo `TRUNCATE … CASCADE` + seed da D21. API em `127.0.0.1:3334` e Vite em `127.0.0.1:5174` via `webServer` do Playwright. Só Chromium, viewport 390×844. `pnpm test:e2e` separado do `pnpm test`. `workers: 1`. Não há CI no repositório; se for adicionado, cachear `~/.cache/ms-playwright` e rodar `pnpm test:e2e:install`.
+- **Por quê:** a suíte fica repetível e em qualquer ordem, convive com o app de dev, e quem clona sem browser não quebra o pipeline de Vitest.
+- **Com mais tempo:** workflow de CI com cache de browsers; um Postgres efêmero só do job; rodar o e2e contra o build de produção (`vite preview`) além do dev server.

@@ -3,7 +3,7 @@
 Módulo de montagem de pedidos para vendedores externos. Requisitos e regras: [`PRD.md`](PRD.md).
 Decisões: [`DECISIONS.md`](DECISIONS.md) · Assunções: [`ASSUMPTIONS.md`](ASSUMPTIONS.md) · Uso de IA: [`AI_LOG.md`](AI_LOG.md) · Plano de tarefas: [`TASKS.md`](TASKS.md).
 
-> **Status:** Tarefas obrigatórias T-00–T-31 concluídas (F0–F8; req. 1–8 e V1 do req. 9: rascunho local + reenvio idempotente). Opcionais T-32–T-34 não feitos.
+> **Status:** Tarefas obrigatórias T-00–T-31 concluídas (F0–F8; req. 1–8 e V1 do req. 9: rascunho local + reenvio idempotente). Opcional T-32 (e2e Playwright dos fluxos R1–R9) feito. T-33 e T-34 não feitos.
 >
 > O desafio foi entregue ao recrutador em 26/10/2026 com o repositório incompleto. O estado no prazo é o commit [`af003cc`](https://github.com/Edu-Garcia/yandeh-pedidos/tree/af003cc9b2f8b06639fb757cd27388568e8a2c51) (merge do PR #25, T-22): no `TASKS.md` daquele commit, T-00–T-22 estavam `[x]` (F0–F4 e a API de histórico/repetir; 25 de 34). Depois do prazo: tela de histórico (T-23), supervisor (T-24/T-25) e offline parcial V1 (T-26/T-27).
 
@@ -45,7 +45,7 @@ pnpm dev                              # api (3333) + web (5173)
 
 `@yandeh/shared` exporta `dist/`. Os scripts de raiz `pnpm dev`, `pnpm test` e `pnpm typecheck` compilam o shared antes (em clone limpo, `pnpm typecheck`/`pnpm test` falhavam sem o `dist/`). `pnpm --filter @yandeh/shared build` continua disponível se precisar do `dist/` isolado.
 
-Variáveis da API (ver `.env.example`, `apps/api/src/env.ts` e `docker-compose.yml`): `DATABASE_URL`, `TEST_DATABASE_URL` (só nos testes; default = `DATABASE_URL` com sufixo `_test`), `API_PORT`, `HOST` (default `0.0.0.0`), `BUSINESS_TIMEZONE` (fuso da data civil do pedido; default `America/Fortaleza`).
+Variáveis da API (ver `.env.example`, `apps/api/src/env.ts` e `docker-compose.yml`): `DATABASE_URL`, `TEST_DATABASE_URL` (só nos testes da API; default = `DATABASE_URL` com sufixo `_test`), `E2E_DATABASE_URL` (só no Playwright; default = `DATABASE_URL` com sufixo `_e2e`), `API_PORT`, `HOST` (default `0.0.0.0`), `BUSINESS_TIMEZONE` (fuso da data civil do pedido; default `America/Fortaleza`).
 
 ### Usuários de teste (login simulado)
 
@@ -62,7 +62,7 @@ Exemplo do PRD (V01 / C001 / TP01): P001 10 un 0%, P006 40 un 2%, P010 24 un 0% 
 
 ## Como testar
 
-Os testes da API usam um **banco isolado**, derivado de `DATABASE_URL` com sufixo `_test` (default `postgres://yandeh:yandeh@localhost:5432/yandeh_test`). O `globalSetup` do Vitest cria o banco se não existir, aplica as migrações e faz `TRUNCATE` + seed antes da suíte; cada teste da API reseeda de novo. O banco de desenvolvimento (`yandeh`) não é lido nem escrito — pedidos criados pelo app (R1–R9, Docker ou `pnpm dev`) continuam lá. Vale no fluxo Docker do README, no Postgres local e se houver CI. Suba o Postgres antes (`docker compose up -d postgres` ou o stack completo). Para apontar para outro banco: `TEST_DATABASE_URL`. Shared e web não precisam do banco.
+Os testes da API usam um **banco isolado**, derivado de `DATABASE_URL` com sufixo `_test` (default `postgres://yandeh:yandeh@localhost:5432/yandeh_test`). O `globalSetup` do Vitest cria o banco se não existir, aplica as migrações e faz `TRUNCATE` + seed antes da suíte; cada teste da API reseeda de novo. Os e2e Playwright usam outro banco (`yandeh_e2e`, ou `E2E_DATABASE_URL`), no mesmo padrão (D21/D22): criam o banco, migram e reseedeiam a cada teste. O banco de desenvolvimento (`yandeh`) não é lido nem escrito — pedidos criados pelo app (R1–R9, Docker ou `pnpm dev`) continuam lá. Vale no fluxo Docker do README, no Postgres local e se houver CI. Suba o Postgres antes (`docker compose up -d postgres` ou o stack completo). Para apontar para outro banco: `TEST_DATABASE_URL` / `E2E_DATABASE_URL`. Shared e web (Vitest) não precisam do banco.
 
 ```bash
 pnpm install
@@ -73,6 +73,17 @@ pnpm format:check
 ```
 
 `pnpm test` e `pnpm typecheck` compilam `@yandeh/shared` antes, então o pipeline acima funciona num clone limpo (sem passo extra de `pnpm --filter @yandeh/shared build`).
+
+`pnpm test` **não** roda o Playwright: os e2e pedem Chromium instalado. Depois do `pnpm install`, uma vez por máquina:
+
+```bash
+pnpm test:e2e:install   # playwright install --with-deps chromium
+pnpm test:e2e
+```
+
+`pnpm test:e2e` compila o shared, cria/migra `yandeh_e2e` se faltar, sobe API em `127.0.0.1:3334` e Vite em `127.0.0.1:5174` (webServer do Playwright; portas distintas de 3333/5173 para conviver com `docker compose` / `pnpm dev`) e roda os fluxos R1–R9 no Chromium com viewport 390×844. Cada teste reseeda o banco, então a suíte passa repetidamente e em qualquer ordem.
+
+Não há workflow de CI neste repositório. Se for adicionado, incluir `pnpm test:e2e` com `pnpm test:e2e:install` (ou `playwright install --with-deps chromium`) e cache de `~/.cache/ms-playwright`.
 
 `pnpm test` compila o shared e em seguida roda `pnpm -r test` (Vitest em cada pacote). O que cada suíte cobre:
 
@@ -111,7 +122,18 @@ Arquivos em `packages/shared/src/*.test.ts`:
 - Aprovações do supervisor (lista, confirmar, 422 de crédito)
 - Cliente HTTP (`X-Seller-Id` / `X-Supervisor-Id` / `Idempotency-Key`)
 
-Não há e2e Playwright (T-32) nem testes de componente com Vue Test Utils (T-33).
+### e2e Playwright (`pnpm test:e2e`, banco `yandeh_e2e`)
+
+Viewport 390×844. Cobre o roteiro R1–R9 no browser (T-32):
+
+- Login/sessão do vendedor; carteira só com os clientes dele e **nome da tabela** (não o id `TP01`)
+- Cliente de outra carteira e rota inexistente → a mesma página 404, URL mantida
+- Busca por descrição e EAN; a UI **não mostra** id de produto (`P009` etc.)
+- Carrinho Unidades/Lote, desconto, mínimo e crédito bloqueando Enviar
+- Envio Enviado / Aguardando aprovação; aprovação e rejeição do supervisor com confirmação inline
+- Repetir pedido; rascunho sobrevivendo ao reload; offline com "Aguardando conexão" e um único envio ao voltar a rede (`context.setOffline`)
+
+Não há testes de componente com Vue Test Utils (T-33).
 
 ## Banco de dados
 
@@ -121,7 +143,7 @@ Não há e2e Playwright (T-32) nem testes de componente com Vue Test Utils (T-33
 
 ## O que ficou de fora
 
-Escopo do PRD §5.2, V1 do req. 9 (A20) e opcionais T-32–T-34:
+Escopo do PRD §5.2, V1 do req. 9 (A20) e opcionais T-33–T-34:
 
 - Offline completo: catálogo/preços offline, sincronização bidirecional e resolução de conflitos. A V1 cobre rascunho em localStorage (`yandeh.orderDraft`) + retentativa com a mesma `Idempotency-Key`. Sem service worker, sem fila de vários pedidos e sem botão de cancelar pendente (A52, A54).
 - Cache do catálogo do cliente em IndexedDB para busca offline (T-34).
@@ -133,8 +155,7 @@ Escopo do PRD §5.2, V1 do req. 9 (A20) e opcionais T-32–T-34:
 - Leitura de código de barras pela câmera (busca por EAN digitado).
 - Notificações.
 - Multi-supervisor (só S01).
-- Teste e2e Playwright do fluxo feliz (T-32).
-- Testes de componente do carrinho com Vue Test Utils (T-33); a suíte web cobre store e páginas com happy-dom.
+- Testes de componente do carrinho com Vue Test Utils (T-33); a suíte web cobre store e páginas com happy-dom. Os e2e Playwright (T-32) cobrem o carrinho no browser.
 
 Limitações do seed/regras (não são bugs da V1):
 
