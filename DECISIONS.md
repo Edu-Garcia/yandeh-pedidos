@@ -169,3 +169,11 @@ Decisões marcadas **[autor]** foram tomadas pelo candidato (com os motivos dele
 - **Escolha:** `businessDate(now, timeZone)` em `@yandeh/shared` (`Intl.DateTimeFormat('en-CA')`, relógio injetável). A API lê `BUSINESS_TIMEZONE` (default `America/Fortaleza`) e grava a data civil desse fuso. Sem guard contra fuso inválido (escopo da T-14b).
 - **Por quê:** a data que o vendedor e o histórico mostram é a do negócio, não a do UTC. Fortaleza não tem horário de verão; o default cobre o seed.
 - **Com mais tempo:** validar o fuso na subida da API e, se o cadastro crescesse para outros estados, fuso por cliente. O front já formata `YYYY-MM-DD` fatiando a string (A38), sem `new Date`.
+
+## D21 — Banco isolado para os testes da API [autor]
+
+- **Contexto:** `pnpm test` usava o mesmo Postgres de desenvolvimento (`yandeh`). Depois do roteiro R1–R9 (ou qualquer uso do app), o crédito do C001 já estava consumido e a suíte falhava; um `db:seed` idempotente (`ON CONFLICT DO NOTHING`) não restaura saldo.
+- **Alternativas:** schema `test` no mesmo banco; `TEMPLATE yandeh` (copiaria o estado sujo); truncate+seed no banco de dev (apagaria pedidos reais); exigir seed limpo na documentação.
+- **Escolha:** `DATABASE_URL` com sufixo `_test` (default `yandeh_test`), ou `TEST_DATABASE_URL`. O `globalSetup` do Vitest cria o banco se não existir (conexão em `postgres`, fallback no banco de dev), migra e faz `TRUNCATE … CASCADE` + seed. Cada teste da API reseeda. Não usa `TEMPLATE` do banco de dev. `fileParallelism: false` e `maxWorkers: 1`.
+- **Por quê:** é o caminho mais simples que deixa o banco de dev intacto, funciona no Docker do README, no fluxo local e se houver CI, e a suíte passa em qualquer ordem e repetidamente.
+- **Com mais tempo:** um Postgres só de CI no workflow; containers de teste efêmeros. Para o desafio, um segundo banco no mesmo Postgres basta.

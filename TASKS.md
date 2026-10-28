@@ -37,8 +37,8 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | F5 — Histórico e repetir (req. 8) | 2       | 2      |
 | F6 — Supervisor (fecha req. 5)    | 2       | 2      |
 | F7 — Offline parcial (req. 9)     | 2       | 2      |
-| F8 — Entrega e docs               | 4       | 3      |
-| **Total**                         | **34**  | **33** |
+| F8 — Entrega e docs               | 4       | 4      |
+| **Total**                         | **34**  | **34** |
 | Opcionais                         | 3       | 0      |
 
 > Sem estimativas de tempo: com IA acelerando a implementação, elas não refletem dados reais. Prioridade: núcleo (F1–F4 + F8, req. 1–7) primeiro. Se o prazo apertar, corte na ordem: opcionais → F7 → F6 (T-25) → F5, e registre em README "o que ficou de fora".
@@ -403,13 +403,14 @@ Validação comum: `pnpm --filter @yandeh/web typecheck && pnpm --filter @yandeh
 - **Commit:** `docs: AI_LOG com momentos de uso de IA e mapa de autoria`
 - **Status:** feito
 
-### [ ] T-31 — Verificação final a partir de clone limpo
+### [x] T-31 — Verificação final a partir de clone limpo
 
 - **Depende de:** T-30
 - **Validação:** `git clone <repo> /tmp/check && cd /tmp/check && docker compose up --build`; roteiro manual R1–R9 (seção 11 do PRD); `pnpm install && pnpm test && pnpm typecheck && pnpm lint && pnpm format:check`; `git log` com linha `IA:` em todos os commits (`git log --format=%B | grep -c '^IA:'` = nº de commits).
-- **Validação manual:** `git clone <repo> /tmp/check && cd /tmp/check && docker compose up --build`. Percorrer o roteiro manual R1–R9 do PRD §11 na Web/API (V01/C001 exemplo R$ 519,30 Enviado; busca achocolatado/`7891831978575`; P006/P004 embalagem; bloqueios mínimo/crédito; alçada; repetir PH001; rascunho + idempotência). `pnpm install && pnpm test && pnpm typecheck && pnpm lint && pnpm format:check`. `git log --format=%B | grep -c '^IA:'` = número de commits. Evidência: checklist R1–R9 + saídas.
-- **Aceite:** tudo verde; só correções pontuais (cada uma em commit próprio).
-- **Commit:** só se houver correção (`fix: ...`).
+- **Validação manual:** clone em `/tmp/check` da `main` (`5961c04`). `cp .env.example .env` + `docker compose up --build` → web 5173 HTTP 200 e `GET /health` → `{"status":"ok"}`. R1–R9 na API (curl) e na Web (390px): carteira V01 C001–C004; busca achocolatado/EAN P009+P023; C004 aviso TP01; P006 lote 2 = 40 un somente leitura; P004 7 un lote vazio; exemplo C001 R$ 519,30 Enviado; mínimo/crédito bloqueiam Enviar; alçada → Aguardando aprovação + S01 aprova; repetir PH001 remove biscoito inativo e zera descontos; rascunho sobrevive ao reload e some após envio; mesma `Idempotency-Key` 201+200 com 1 linha. Pipeline no clone: typecheck/test falhavam sem `dist/` do shared; após `build:shared` no typecheck/test, `pnpm test` 134+64+119, typecheck/lint/format:check ok. `grep -c '^IA:'` = 40 vs 38 não-merge (2 merges locais também têm trailer; nenhum não-merge sem `IA:`). Banco `yandeh_test`: após `POST /orders` C001 (id `6640b1a0-…`, 7 pedidos no `yandeh`, crédito usado 274442) `pnpm test` passou e os 7 pedidos/crédito de dev permaneceram; `pnpm test` 2× seguidas verdes (134+64+119).
+- **Aceite:** tudo verde; correções pontuais (build do shared antes de typecheck/test; `HOST` no `.env.example`; banco de teste isolado).
+- **Commit:** `fix: isola o banco de teste da API e builda o shared no typecheck`
+- **Status:** feito
 
 ## Opcionais (somente se sobrar tempo)
 

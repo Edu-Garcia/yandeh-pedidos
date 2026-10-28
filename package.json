@@ -7,10 +7,11 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "pnpm -r --parallel dev",
+    "build:shared": "pnpm --filter @yandeh/shared build",
+    "dev": "pnpm run build:shared && pnpm -r --parallel dev",
     "build": "pnpm -r build",
-    "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test",
+    "typecheck": "pnpm run build:shared && pnpm -r typecheck",
+    "test": "pnpm run build:shared && pnpm -r test",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
