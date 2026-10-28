@@ -11,7 +11,7 @@ Decisões marcadas **[autor]** foram tomadas pelo candidato (com os motivos dele
 - **Alternativas:** outra stack (exigiria justificativa).
 - **Escolha:** Vue 3, Node.js + TypeScript, PostgreSQL.
 - **Por quê:** é a stack recomendada e usada pelo time; reduz atrito na avaliação e na conversa.
-- **Com mais tempo:** não trocaria a stack. O e2e Playwright (T-32) e a verificação a partir de clone limpo (T-31) já existem; o ganho que restou é o teste de componente do carrinho (T-33).
+- **Com mais tempo:** não trocaria a stack. T-31 (clone limpo), T-32 (e2e Playwright) e T-33 (componentes VTU do carrinho) já existem; o ganho que restou no front é o cache IndexedDB (T-34).
 
 ## D2 — Backend: Fastify [autor]
 
@@ -35,7 +35,7 @@ Decisões marcadas **[autor]** foram tomadas pelo candidato (com os motivos dele
 - **Alternativas:** PrimeVue (visual genérico de admin); Vuetify (pesado e opinativo).
 - **Escolha:** Tailwind CSS v4.
 - **Por quê:** liberdade visual total, layout livre, combina com a skill `frontend-design`.
-- **Com mais tempo:** manteria Tailwind. O e2e (T-32) já exercita o viewport de 390 px; fecharia os testes de componente do carrinho (T-33).
+- **Com mais tempo:** manteria Tailwind. O e2e (T-32) já exercita o viewport de 390 px; os testes de componente do carrinho (T-33) fecham a suíte de UI sem browser.
 
 ## D5 — Monorepo pnpm com `packages/shared` para regras de negócio [autor]
 
@@ -75,7 +75,7 @@ Decisões marcadas **[autor]** foram tomadas pelo candidato (com os motivos dele
 - **Alternativas:** guardar quantidade em embalagens; campo livre com validação; seletor de modo (unidade ou embalagem) por item (versão anterior, substituída).
 - **Escolha:** cada item tem dois campos interligados, **Unidades** e **Lote** (CX ou FD; produtos `UN` fator 1 mostram só Unidades). Lote → `Unidades = lote × fator`; Unidades múltiplo do fator → Lote = `unidades / fator`, senão Lote vazio. Com `venda_somente_multiplo = true`, Unidades fica somente leitura e só muda pelo Lote. Banco continua guardando só unidades. Comportamento no repetir pedido: ver D13.
 - **Por quê:** o vendedor pode pensar em unidades ou em lotes sem trocar de modo; os dois valores nunca divergem; a regra "só por lote" é garantida pela própria UI em vez de um erro depois do fato; histórico do seed está em unidades.
-- **Com mais tempo:** testes de componente do carrinho (T-33). Num produto real, refinaria com o PO se vale persistir o modo de entrada (já considerado e recusado em D13).
+- **Com mais tempo:** os testes de componente do carrinho (T-33) já existem (`CartLine` + painel da `OrderPage` com Vue Test Utils). Num produto real, refinaria com o PO se vale persistir o modo de entrada (já considerado e recusado em D13).
 
 ## D10 — Crédito: bloqueio, reserva por pendentes, supervisor [autor]
 
@@ -160,7 +160,7 @@ Decisões marcadas **[autor]** foram tomadas pelo candidato (com os motivos dele
 - **Alternativas:** commits grandes por fase; squash no merge; várias tarefas no mesmo PR.
 - **Escolha:** tarefas de escopo fechado em `TASKS.md` (uma por commit, Conventional Commits, trailer `IA:`). PR com testes e validação manual colada. Merge **sem squash**. Problemas encontrados numa tarefa se resolvem nela.
 - **Por quê:** mudanças pequenas e explicáveis; o `git log` mostra a evolução (F1 regras → F3 API → F4 telas → F8 docs) e a linha `IA:` em cada commit.
-- **Com mais tempo:** T-31 e T-32 já existem; restam os opcionais T-33 e T-34. O processo em si não mudaria.
+- **Com mais tempo:** T-31, T-32 e T-33 já existem; resta o opcional T-34. O processo em si não mudaria.
 
 ## D20 — Data civil do pedido no fuso do negócio [autor]
 
