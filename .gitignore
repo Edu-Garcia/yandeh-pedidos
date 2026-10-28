@@ -8,5 +8,9 @@ coverage/
 .DS_Store
 .vite/
 *.tsbuildinfo
+/playwright-report/
+/test-results/
+/blob-report/
+/playwright/.cache/
 # Log privado de prompts de IA (não versionar)
 .ai-private/

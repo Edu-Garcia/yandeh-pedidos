@@ -3,8 +3,10 @@ import {
   DEFAULT_DATABASE_URL,
   databaseNameFromUrl,
   maintenanceDatabaseUrl,
+  resolveE2eDatabaseUrl,
   resolveTestDatabaseUrl,
   withoutTestSuffix,
+  withE2eDatabaseSuffix,
   withTestDatabaseSuffix,
 } from './test-database-url.js'
 
@@ -50,5 +52,35 @@ describe('test database URL', () => {
     expect(withoutTestSuffix('postgres://yandeh:yandeh@localhost:5432/yandeh_test')).toBe(
       'postgres://yandeh:yandeh@localhost:5432/yandeh',
     )
+  })
+
+  it('acrescenta _e2e ao banco do DATABASE_URL', () => {
+    expect(withE2eDatabaseSuffix(DEFAULT_DATABASE_URL)).toBe(
+      'postgres://yandeh:yandeh@localhost:5432/yandeh_e2e',
+    )
+  })
+
+  it('não empilha _e2e em cima de _test', () => {
+    expect(withE2eDatabaseSuffix('postgres://yandeh:yandeh@localhost:5432/yandeh_test')).toBe(
+      'postgres://yandeh:yandeh@localhost:5432/yandeh_e2e',
+    )
+  })
+
+  it('não duplica o sufixo _e2e', () => {
+    const already = 'postgres://yandeh:yandeh@localhost:5432/yandeh_e2e'
+    expect(withE2eDatabaseSuffix(already)).toBe(already)
+  })
+
+  it('E2E_DATABASE_URL tem prioridade sobre o sufixo', () => {
+    expect(
+      resolveE2eDatabaseUrl({
+        DATABASE_URL: DEFAULT_DATABASE_URL,
+        E2E_DATABASE_URL: 'postgres://yandeh:yandeh@localhost:5432/custom_e2e',
+      }),
+    ).toBe('postgres://yandeh:yandeh@localhost:5432/custom_e2e')
+  })
+
+  it('usa o default yandeh_e2e quando não há DATABASE_URL', () => {
+    expect(resolveE2eDatabaseUrl({})).toBe('postgres://yandeh:yandeh@localhost:5432/yandeh_e2e')
   })
 })

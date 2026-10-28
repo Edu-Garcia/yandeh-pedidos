@@ -43,3 +43,31 @@ export function withoutTestSuffix(databaseUrl: string): string {
   url.pathname = `/${baseName}`
   return url.toString()
 }
+
+function baseDatabaseName(databaseUrl: string): string {
+  const name = databaseNameFromUrl(databaseUrl)
+  if (name.endsWith('_e2e')) return name.slice(0, -'_e2e'.length) || 'yandeh'
+  if (name.endsWith('_test')) return name.slice(0, -'_test'.length) || 'yandeh'
+  return name
+}
+
+export function withE2eDatabaseSuffix(databaseUrl: string): string {
+  const url = new URL(databaseUrl)
+  const name = databaseNameFromUrl(databaseUrl)
+  if (name.endsWith('_e2e')) {
+    return databaseUrl
+  }
+  url.pathname = `/${baseDatabaseName(databaseUrl)}_e2e`
+  return url.toString()
+}
+
+export function resolveE2eDatabaseUrl(
+  env: Record<string, string | undefined> = process.env,
+): string {
+  const override = env.E2E_DATABASE_URL?.trim()
+  if (override) {
+    return override
+  }
+  const base = env.DATABASE_URL?.trim() || DEFAULT_DATABASE_URL
+  return withE2eDatabaseSuffix(base)
+}

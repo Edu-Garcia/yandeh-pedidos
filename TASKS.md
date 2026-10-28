@@ -39,7 +39,7 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | F7 — Offline parcial (req. 9)     | 2       | 2      |
 | F8 — Entrega e docs               | 4       | 4      |
 | **Total**                         | **34**  | **34** |
-| Opcionais                         | 3       | 0      |
+| Opcionais                         | 3       | 1      |
 
 > Sem estimativas de tempo: com IA acelerando a implementação, elas não refletem dados reais. Prioridade: núcleo (F1–F4 + F8, req. 1–7) primeiro. Se o prazo apertar, corte na ordem: opcionais → F7 → F6 (T-25) → F5, e registre em README "o que ficou de fora".
 
@@ -414,10 +414,18 @@ Validação comum: `pnpm --filter @yandeh/web typecheck && pnpm --filter @yandeh
 
 ## Opcionais (somente se sobrar tempo)
 
-### [ ] T-32 — (opcional) Teste e2e do fluxo feliz (Playwright)
+### [x] T-32 — (opcional) Testes e2e com Playwright dos fluxos principais (R1–R9)
 
-- **Depende de:** T-21 · **Aceite:** V01 → C001 → exemplo R$ 519,30 → "Enviado".
-- **Validação manual:** Rodar o e2e Playwright do fluxo feliz. No browser, o mesmo caminho: V01 → C001 → montar o exemplo (P001 10, P006 40 @ 2%, P010 24) → total R$ 519,30 → Enviar → "Enviado". Evidência: relatório Playwright + screenshot do resultado.
+- **Refs:** PRD §7, §11 R1–R9; D21, D22.
+- **Depende de:** T-21, T-23, T-25, T-27, T-31
+- **Escopo:** suíte Playwright (viewport 390×844) dos fluxos que fazem sentido no navegador: login/sessão e carteira só com os clientes do vendedor (nome da tabela, não o id `TP01`); cliente de outra carteira e rota inexistente → a mesma página 404 mantendo a URL; busca por descrição e EAN; a UI nunca mostra id de produto; montar pedido com unidades/lote, desconto, mínimo e crédito bloqueando Enviar; envio Enviado / Aguardando aprovação; aprovação/rejeição pelo supervisor com confirmação inline; repetir pedido; rascunho sobrevivendo ao reload; offline com "Aguardando conexão" e um único envio ao voltar a rede (`context.setOffline`). Banco próprio `yandeh_e2e` (reset de seed por teste, padrão D21). Script `pnpm test:e2e` (webServer sobe API 3334 + Vite 5174). Fora do `pnpm test`.
+- **Fora:** T-33 (componentes VTU); T-34 (cache IndexedDB); Firefox/WebKit; workflow de CI (não existe no repo; documentado o que faria).
+- **Aceite:** `pnpm test:e2e` 2× seguidas verde; não toca `yandeh` nem `yandeh_test`; V01 → C001 → exemplo R$ 519,30 → "Enviado"; demais R1–R9 cobertos.
+- **Validação:** `pnpm test:e2e` 2×; `pnpm typecheck && pnpm lint && pnpm format:check && pnpm test`.
+- **Validação manual:** `pnpm test:e2e` duas vezes (ambas verdes). Relatório Playwright + screenshots dos fluxos (carteira, 404, busca, totais, Enviado, aprovação, repetir, rascunho, offline). Evidência na descrição do PR.
+- **Docs:** README (como testar, status, fora do escopo); DECISIONS D22; `.env.example`.
+- **Commit:** `test(web): testes e2e com Playwright dos fluxos principais`
+- **Status:** feito
 
 ### [ ] T-33 — (opcional) Testes de componente do carrinho (Vitest + Vue Test Utils)
 
