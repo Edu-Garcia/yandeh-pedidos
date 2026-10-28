@@ -39,7 +39,7 @@ Cada tarefa é uma unidade de **escopo fechado**: implementável, validável e c
 | F7 — Offline parcial (req. 9)     | 2       | 2      |
 | F8 — Entrega e docs               | 4       | 4      |
 | **Total**                         | **34**  | **34** |
-| Opcionais                         | 3       | 1      |
+| Opcionais                         | 3       | 2      |
 
 > Sem estimativas de tempo: com IA acelerando a implementação, elas não refletem dados reais. Prioridade: núcleo (F1–F4 + F8, req. 1–7) primeiro. Se o prazo apertar, corte na ordem: opcionais → F7 → F6 (T-25) → F5, e registre em README "o que ficou de fora".
 
@@ -427,10 +427,18 @@ Validação comum: `pnpm --filter @yandeh/web typecheck && pnpm --filter @yandeh
 - **Commit:** `test(web): testes e2e com Playwright dos fluxos principais`
 - **Status:** feito
 
-### [ ] T-33 — (opcional) Testes de componente do carrinho (Vitest + Vue Test Utils)
+### [x] T-33 — (opcional) Testes de componente do carrinho (Vitest + Vue Test Utils)
 
-- **Depende de:** T-20 · **Aceite:** P006 com Unidades somente leitura e Lote FD; P004 7 un → Lote vazio; bloqueios exibidos.
-- **Validação manual:** Rodar os testes de componente (Vitest + Vue Test Utils). No browser, no carrinho de C001: P006 com Unidades somente leitura e rótulo Lote FD; P004 com 7 un → Lote vazio; bloqueios visíveis. Evidência: saída do Vitest + screenshots.
+- **Refs:** RN05–RN10; D9; R3, R4, R5, R7.
+- **Depende de:** T-20
+- **Escopo:** testes de componente com Vitest + `@vue/test-utils` (happy-dom) montando `CartLine` e a seção de carrinho da `OrderPage` com Pinia de teste; API mockada (sem fetch real). Comportamento observável: Unidades/Lote, totais e arredondamento por linha, bloqueios de mínimo/crédito, aviso de alçada, remover/rascunho vazio, rascunho travado em envio pendente, nenhum id de produto no texto. Sem extrair um `Cart.vue` (evita mudança de produção).
+- **Fora:** reescrever a suíte `OrderPage.test.ts` (createApp) em VTU; T-34; mudança de comportamento da UI.
+- **Aceite:** P006 com Unidades somente leitura e Lote FD; P004 7 un → Lote vazio; bloqueios exibidos. Demais cenários do prompt cobertos na suíte VTU.
+- **Validação:** `pnpm --filter @yandeh/web test` (inclui `CartLine.test.ts` e `OrderPage.cart.test.ts`); `pnpm typecheck && pnpm lint && pnpm format:check && pnpm test`; `pnpm test:e2e`.
+- **Validação manual:** `pnpm --filter @yandeh/web exec vitest run src/components/CartLine.test.ts src/pages/OrderPage.cart.test.ts` verde (14 testes). Pipeline completo e e2e verdes. Sem mudança de UI; conferência visual do carrinho C001 permanece a da T-20/T-21/T-32 (P006 Unidades somente leitura + Lote FD; P004 7 un → Lote vazio; bloqueios visíveis). Evidência: saída do Vitest na descrição do PR.
+- **Docs:** README (status, como testar, fora do escopo); DECISIONS D1/D4/D9/D19 (T-33 feito).
+- **Commit:** `test(web): testes de componente do carrinho`
+- **Status:** feito
 
 ### [ ] T-34 — (opcional) Cache do catálogo do cliente para busca offline
 

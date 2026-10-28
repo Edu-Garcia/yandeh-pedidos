@@ -3,7 +3,7 @@
 Módulo de montagem de pedidos para vendedores externos. Requisitos e regras: [`PRD.md`](PRD.md).
 Decisões: [`DECISIONS.md`](DECISIONS.md) · Assunções: [`ASSUMPTIONS.md`](ASSUMPTIONS.md) · Uso de IA: [`AI_LOG.md`](AI_LOG.md) · Plano de tarefas: [`TASKS.md`](TASKS.md).
 
-> **Status:** Tarefas obrigatórias T-00–T-31 concluídas (F0–F8; req. 1–8 e V1 do req. 9: rascunho local + reenvio idempotente). Opcional T-32 (e2e Playwright dos fluxos R1–R9) feito. T-33 e T-34 não feitos.
+> **Status:** Tarefas obrigatórias T-00–T-31 concluídas (F0–F8; req. 1–8 e V1 do req. 9: rascunho local + reenvio idempotente). Opcionais T-32 (e2e Playwright dos fluxos R1–R9) e T-33 (componentes VTU do carrinho) feitos. T-34 não feito.
 >
 > O desafio foi entregue ao recrutador em 26/10/2026 com o repositório incompleto. O estado no prazo é o commit [`af003cc`](https://github.com/Edu-Garcia/yandeh-pedidos/tree/af003cc9b2f8b06639fb757cd27388568e8a2c51) (merge do PR #25, T-22): no `TASKS.md` daquele commit, T-00–T-22 estavam `[x]` (F0–F4 e a API de histórico/repetir; 25 de 34). Depois do prazo: tela de histórico (T-23), supervisor (T-24/T-25) e offline parcial V1 (T-26/T-27).
 
@@ -119,6 +119,7 @@ Arquivos em `packages/shared/src/*.test.ts`:
 - Sessão Pinia e guard de rota/papel (T-17)
 - Carteira: formatação BRL, destaque abaixo do mínimo, renderização (T-18)
 - Pedido: debounce da busca, P009/P023, aviso de fallback, carrinho Unidades/Lote, totais/bloqueios/envio, histórico e repetir, rascunho em localStorage, retentativa idempotente (rede/5xx/offline; 422 não retenta)
+- Carrinho (T-33): componentes com Vue Test Utils — `CartLine` (Unidades/Lote, líquido da linha, remover, travado) e painel da `OrderPage` (totais C001, mínimo/crédito, alçada, rascunho vazio, envio pendente); API mockada; sem id de produto no texto
 - Aprovações do supervisor (lista, confirmar, 422 de crédito)
 - Cliente HTTP (`X-Seller-Id` / `X-Supervisor-Id` / `Idempotency-Key`)
 
@@ -133,8 +134,6 @@ Viewport 390×844. Cobre o roteiro R1–R9 no browser (T-32):
 - Envio Enviado / Aguardando aprovação; aprovação e rejeição do supervisor com confirmação inline
 - Repetir pedido; rascunho sobrevivendo ao reload; offline com "Aguardando conexão" e um único envio ao voltar a rede (`context.setOffline`)
 
-Não há testes de componente com Vue Test Utils (T-33).
-
 ## Banco de dados
 
 - Schema: `apps/api/src/db/schema.ts`. Nova migração: `pnpm --filter @yandeh/api db:generate`.
@@ -143,7 +142,7 @@ Não há testes de componente com Vue Test Utils (T-33).
 
 ## O que ficou de fora
 
-Escopo do PRD §5.2, V1 do req. 9 (A20) e opcionais T-33–T-34:
+Escopo do PRD §5.2, V1 do req. 9 (A20) e opcional T-34:
 
 - Offline completo: catálogo/preços offline, sincronização bidirecional e resolução de conflitos. A V1 cobre rascunho em localStorage (`yandeh.orderDraft`) + retentativa com a mesma `Idempotency-Key`. Sem service worker, sem fila de vários pedidos e sem botão de cancelar pendente (A52, A54).
 - Cache do catálogo do cliente em IndexedDB para busca offline (T-34).
@@ -155,7 +154,6 @@ Escopo do PRD §5.2, V1 do req. 9 (A20) e opcionais T-33–T-34:
 - Leitura de código de barras pela câmera (busca por EAN digitado).
 - Notificações.
 - Multi-supervisor (só S01).
-- Testes de componente do carrinho com Vue Test Utils (T-33); a suíte web cobre store e páginas com happy-dom. Os e2e Playwright (T-32) cobrem o carrinho no browser.
 
 Limitações do seed/regras (não são bugs da V1):
 
