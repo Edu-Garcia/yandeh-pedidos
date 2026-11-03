@@ -5,6 +5,7 @@ import {
   addProduct,
   cartLine,
   customerCredit,
+  expectNoVisiblePersonIds,
   openCustomer,
   signInSeller,
   signInSupervisor,
@@ -29,9 +30,13 @@ test.describe('R5 R7 — aprovação e rejeição do supervisor', () => {
     const pending = page.locator('[data-customer-id="C001"]')
     await expect(pending).toContainText(CUSTOMER.c001)
     await expect(pending).toContainText('Carlos Menezes')
+    await expect(pending).not.toContainText('C001')
+    await expect(pending).not.toContainText('V01')
+    await expect(page.getByTestId('session-actor')).toHaveText('Marta Fernandes')
     await expect(pending.getByTestId('discount-vs-authority')).toHaveText(
       'Maior desconto 6% · alçada 5%',
     )
+    await expectNoVisiblePersonIds(page)
     await snapshot(page, 'r5-lista-aprovacoes')
 
     await pending.getByTestId('approve-order').click()

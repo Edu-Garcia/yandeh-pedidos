@@ -81,6 +81,12 @@ function normalizeBRL(value: string): string {
   return value.replace(/[\u00A0\u202F]/g, ' ')
 }
 
+function expectNoVisiblePersonIds(text: string | null | undefined): void {
+  expect(text, 'a UI não deve mostrar id de cliente (ex.: C001)').not.toMatch(/\bC0\d{2}\b/)
+  expect(text, 'a UI não deve mostrar id de vendedor (ex.: V01)').not.toMatch(/\bV0\d\b/)
+  expect(text, 'a UI não deve mostrar id de supervisor (ex.: S01)').not.toMatch(/\bS0\d\b/)
+}
+
 function flush(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0))
 }
@@ -161,14 +167,21 @@ describe('ClientsPage', () => {
     expect(el.textContent).not.toContain('Tabela TP01')
     expect(el.textContent).not.toContain('Tabela TP02')
     expect(el.textContent).toContain('Padrão (fallback)')
+    expect(el.textContent).toContain('Carlos Menezes')
     expect(normalizeBRL(el.textContent ?? '')).toContain(normalizeBRL(formatBRL(380000)))
     expect(normalizeBRL(el.textContent ?? '')).toContain(normalizeBRL(formatBRL(35000)))
+    expectNoVisiblePersonIds(el.textContent)
+    expect(el.textContent).not.toMatch(/\bTP0\d\b/)
 
     const fallbackRow = el.querySelector('[data-customer-id="C004"]')
     expect(fallbackRow?.textContent).toContain('Padrão (fallback)')
+    expect(fallbackRow?.textContent).toContain('Maracanaú/CE')
+    expect(fallbackRow?.textContent).not.toContain('C004')
     expect(el.querySelector('[data-customer-id="C001"]')?.textContent).not.toContain(
       'Padrão (fallback)',
     )
+    expect(el.querySelector('[data-customer-id="C001"]')?.textContent).not.toContain('C001')
+    expect(el.querySelector('[data-testid="session-actor"]')?.textContent).toBe('Carlos Menezes')
   })
 
   it('destaca cliente com crédito abaixo do mínimo e navega para o pedido', async () => {
@@ -181,7 +194,9 @@ describe('ClientsPage', () => {
     expect(row?.textContent).toContain('Mossoró/RN')
     expect(row?.textContent).toContain('Tabela Interior')
     expect(row?.textContent).toContain('Crédito abaixo do mínimo')
+    expect(row?.textContent).not.toContain('C006')
     expect(normalizeBRL(row?.textContent ?? '')).toContain(normalizeBRL(formatBRL(10000)))
+    expectNoVisiblePersonIds(el.textContent)
 
     const link = row?.querySelector('a')
     expect(link?.getAttribute('href')).toBe('/clientes/C006/pedido')

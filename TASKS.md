@@ -440,6 +440,20 @@ Validação comum: `pnpm --filter @yandeh/web typecheck && pnpm --filter @yandeh
 - **Commit:** `test(web): testes de componente do carrinho`
 - **Status:** feito
 
+## Correções pós-entrega
+
+### [x] T-35 — UI sem ids de cliente, vendedor e supervisor
+
+- **Refs:** D16 (ampliada); PRD §7.1–7.2.
+- **Escopo:** carteira, "Quem é você?", SessionBar e supervisor mostram só nomes. Id do cliente permanece na URL `/clientes/:clientId/pedido`. `data-*` de teste e rotas/API intactos.
+- **Fora:** mudar rotas, API ou seed.
+- **Aceite:** nenhum `C00x` / `V0x` / `S01` no texto visível; F5, link direto e 404 de outra carteira continuam.
+- **Validação:** `pnpm test && pnpm typecheck && pnpm lint && pnpm format:check && pnpm test:e2e`
+- **Validação manual:** screenshots 390×844 de "Quem é você?", carteira do V01 e tela da supervisora S01, só com nomes.
+- **Docs:** D16, README, PRD §7, AI_LOG.
+- **Commit:** `fix(web): exibir apenas nomes, sem ids, na UI`
+- **Status:** feito
+
 ### [ ] T-34 — (opcional) Cache do catálogo do cliente para busca offline
 
 - **Depende de:** T-27 · **Escopo:** cache da última busca/carteira em IndexedDB, com aviso de preço possivelmente desatualizado (servidor revalida no envio).

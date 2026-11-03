@@ -1,5 +1,6 @@
 import {
   CUSTOMER,
+  expectNoVisiblePersonIds,
   expectNoVisibleProductIds,
   openCustomer,
   signInSeller,
@@ -8,6 +9,21 @@ import {
 import { expect, test } from './fixtures'
 
 test.describe('R1 — sessão e carteira', () => {
+  test('Quem é você? lista só nomes, sem V0x/S01', async ({ page }) => {
+    await page.goto('/')
+    await expect(page.getByRole('heading', { name: 'Quem é você?' })).toBeVisible()
+    await expect(page.getByText('Carlos Menezes')).toBeVisible()
+    await expect(page.getByText('Renata Lima')).toBeVisible()
+    await expect(page.getByText('Paulo Andrade')).toBeVisible()
+    await expect(page.getByText('Marta Fernandes')).toBeVisible()
+    await expect(page.getByText('Desconto até 5%')).toBeVisible()
+    await expect(page.getByText('Aprova pedidos')).toBeVisible()
+    await expect(page.locator('[data-seller-id="V01"]')).not.toContainText('V01')
+    await expect(page.locator('[data-supervisor-id="S01"]')).not.toContainText('S01')
+    await expectNoVisiblePersonIds(page)
+    await snapshot(page, 'r1-quem-e-voce')
+  })
+
   test('V01 vê só a própria carteira, com o nome da tabela', async ({ page }) => {
     await signInSeller(page)
     await expect(page).toHaveURL(/\/clientes$/)
@@ -18,19 +34,24 @@ test.describe('R1 — sessão e carteira', () => {
     await expect(c001).toContainText('Fortaleza/CE')
     await expect(c001).toContainText('Tabela Padrão')
     await expect(c001).not.toContainText('TP01')
+    await expect(c001).not.toContainText('C001')
     await expect(c001).toContainText(/R\$\s*3\.800,00/)
 
     const c002 = page.locator('[data-customer-id="C002"]')
     await expect(c002).toContainText(CUSTOMER.c002)
     await expect(c002).toContainText('Tabela Volume')
     await expect(c002).not.toContainText('TP02')
+    await expect(c002).not.toContainText('C002')
 
     await expect(page.locator('[data-customer-id="C003"]')).toContainText(CUSTOMER.c003)
     await expect(page.locator('[data-customer-id="C004"]')).toContainText(CUSTOMER.c004)
     await expect(page.locator('[data-customer-id="C004"]')).toContainText('Padrão (fallback)')
+    await expect(page.locator('[data-customer-id="C004"]')).not.toContainText('C004')
     await expect(page.getByText(CUSTOMER.c005)).toHaveCount(0)
+    await expect(page.getByTestId('session-actor')).toHaveText('Carlos Menezes')
 
     await expectNoVisibleProductIds(page)
+    await expectNoVisiblePersonIds(page)
     await snapshot(page, 'r1-carteira-v01')
   })
 
@@ -38,7 +59,8 @@ test.describe('R1 — sessão e carteira', () => {
     await signInSeller(page)
     await page.reload()
     await expect(page.getByRole('heading', { name: 'Minha carteira' })).toBeVisible()
-    await expect(page.getByText('V01 Carlos Menezes')).toBeVisible()
+    await expect(page.getByTestId('session-actor')).toHaveText('Carlos Menezes')
+    await expectNoVisiblePersonIds(page)
   })
 
   test('cliente de outra carteira e rota inexistente mostram o mesmo 404, sem mudar a URL', async ({

@@ -58,6 +58,12 @@ function normalizeBRL(value: string): string {
   return value.replace(/[\u00A0\u202F]/g, ' ')
 }
 
+function expectNoVisiblePersonIds(text: string | null | undefined): void {
+  expect(text, 'a UI não deve mostrar id de cliente (ex.: C001)').not.toMatch(/\bC0\d{2}\b/)
+  expect(text, 'a UI não deve mostrar id de vendedor (ex.: V01)').not.toMatch(/\bV0\d\b/)
+  expect(text, 'a UI não deve mostrar id de supervisor (ex.: S01)').not.toMatch(/\bS0\d\b/)
+}
+
 function flush(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0))
 }
@@ -134,12 +140,15 @@ describe('ApprovalsPage', () => {
     expect(el.textContent).toContain('Minibox Bom Preço')
     expect(el.textContent).toContain('Mercadinho São José')
     expect(el.textContent).toContain('Carlos Menezes')
+    expect(el.textContent).toContain('Marta Fernandes')
     expect(el.textContent).toContain(formatCivilDate('2026-10-27'))
     expect(el.textContent).toContain(formatDiscountVsAuthority(6, 5))
     expect(normalizeBRL(el.textContent ?? '')).toContain(normalizeBRL(formatBRL(32000)))
     expect(normalizeBRL(el.textContent ?? '')).toContain(normalizeBRL(formatBRL(50316)))
     expect(el.textContent).not.toContain('P001')
     expect(el.textContent).not.toContain('P008')
+    expectNoVisiblePersonIds(el.textContent)
+    expect(el.querySelector('[data-testid="session-actor"]')?.textContent).toBe('Marta Fernandes')
 
     const row = el.querySelector('[data-order-id="ord-c002"]')
     expect(row?.querySelector('[data-testid="discount-vs-authority"]')?.textContent).toContain(
