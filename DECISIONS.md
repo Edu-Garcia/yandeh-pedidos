@@ -130,13 +130,13 @@ Decisões marcadas **[autor]** foram tomadas pelo candidato (com os motivos dele
 - **Por quê:** o desafio pede o seed intacto; 0 não aparece como ausência no `_meta`. Inventar validação de catálogo no teste técnico misturaria regra de venda com higiene de cadastro.
 - **Com mais tempo:** num produto real, o cadastro teria invariantes (preço > 0, tabela obrigatória) e um pipeline de qualidade do catálogo. Aqui o risco de dado ruim fica explícito (C004/D11, A19).
 
-## D16 — UI sem id de produto; carteira mostra o nome da tabela [autor]
+## D16 — UI sem nenhum id; id do cliente só na URL [autor]
 
-- **Contexto:** a API usa ids (`P001`, `TP01`) como chave. O vendedor em campo precisa de descrição, EAN e preço — não de código interno.
-- **Alternativas:** mostrar o id ao lado da descrição; prefixar "Tabela TP01"; só o badge de fallback, sem o nome.
-- **Escolha:** listas de produto (busca e carrinho) mostram **descrição, EAN e preço** (`OrderPage.vue`, `CartLine.vue`). O id fica só como chave interna (`:key`, `data-product-id`, payload). Avisos de repetir usam a descrição ("Biscoito Recheado Chocolate 140g removido (inativo)"), nunca `P022` (A36, A39). A carteira mostra o **nome** da tabela efetiva (`priceTableName`: Tabela Padrão / Volume / Interior), não o id `TP01` (PR #21). O badge "Padrão (fallback)" cobre o C004.
-- **Por quê:** os nomes do seed já começam com "Tabela"; prefixar o id gerava "Tabela TP01", que não ajuda o vendedor. Ids de produto não são critério de escolha quando a descrição e o EAN distinguem P009 de P023.
-- **Com mais tempo:** ids continuariam na API e nos testes. Se o suporte interno precisasse deles, um modo restrito — não a tela de campo.
+- **Contexto:** a API usa ids (`P001`, `TP01`, `C001`, `V01`, `S01`) como chave. O vendedor em campo precisa de descrição, EAN, preço e **nomes** — não de código interno. Produto e tabela já estavam resolvidos (busca/carrinho sem `P009`; carteira com `priceTableName`). Cliente, vendedor e supervisor ainda vazavam na carteira, em "Quem é você?" e na SessionBar.
+- **Alternativas:** mostrar o id ao lado do nome; prefixar "Tabela TP01"; só o badge de fallback, sem o nome; esconder também o id do cliente na URL (slug por nome).
+- **Escolha:** a UI **não mostra nenhum id** de produto, tabela, cliente, vendedor ou supervisor. Listas de produto (busca e carrinho) mostram **descrição, EAN e preço** (`OrderPage.vue`, `CartLine.vue`). O id fica só como chave interna (`:key`, `data-product-id` / `data-customer-id` / `data-*`, payload). Avisos de repetir usam a descrição ("Biscoito Recheado Chocolate 140g removido (inativo)"), nunca `P022` (A36, A39). A carteira mostra o **nome** da tabela efetiva (`priceTableName`: Tabela Padrão / Volume / Interior), não o id `TP01`, e cidade/UF **sem** o id do cliente. "Quem é você?" e a SessionBar mostram só o nome ("Desconto até X%" / "Aprova pedidos"). **O id do cliente continua na URL** `/clientes/:clientId/pedido` por decisão do autor: F5, link direto e 404 de outra carteira (D14) continuam funcionando. Rotas e API não mudam.
+- **Por quê:** os nomes do seed já começam com "Tabela"; prefixar o id gerava "Tabela TP01", que não ajuda o vendedor. Ids de produto não são critério de escolha quando a descrição e o EAN distinguem P009 de P023. Ids de cliente/vendedor/supervisor também não entram na conversa em campo. Manter o id na URL evita slug frágil e preserva o 404 genérico (D14) para outra carteira.
+- **Com mais tempo:** ids continuariam na API e nos testes. Se o suporte interno precisasse deles, um modo restrito — não a tela de campo. Slug na URL (nome) foi recusado: o id na rota é o trade-off aceito para F5/link/404.
 
 ## D17 — Aprovar/Rejeitar do supervisor exige confirmação inline [autor]
 

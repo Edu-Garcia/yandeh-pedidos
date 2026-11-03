@@ -53,6 +53,16 @@
 
 ---
 
+## Correção pós-entrega — UI sem ids de cliente/vendedor/supervisor
+
+> **[RASCUNHO]** O autor revisa se entra como momento extra (já há 5) ou fica só como nota.
+
+- **Contexto:** D16 já escondia id de produto e o nome da tabela; a carteira ainda mostrava `C001`, "Quem é você?" mostrava `V01`/`S01` e a SessionBar prefixava o id ao nome.
+- **O que foi pedido:** UI sem nenhum id visível; id do cliente continua na URL; testes Vitest/e2e no padrão "sem id de produto".
+- **O que a IA fez:** removeu os ids das três telas e da SessionBar; ampliou D16 com o trade-off da URL (F5/link/404); ajustou asserções.
+
+---
+
 ## Mapa de autoria
 
 Legenda: **Eu escrevi** · **IA gerou, eu revisei/alterei** · **IA gerou, aceitei como veio**
@@ -62,7 +72,7 @@ Legenda: **Eu escrevi** · **IA gerou, eu revisei/alterei** · **IA gerou, aceit
 | Modelagem (schema, entidades)              | IA gerou, eu revisei/alterei | Autor escolheu Drizzle, centavos, `idempotency_key`, status e seed intacto (D3, D8, T-10). Schema e migração gerados pela IA; T-10 só ajustou o que faltava.                                                                                                                                                                                           |
 | Regras de negócio (`packages/shared`)      | IA gerou, eu revisei/alterei | Autor decidiu D7–D13 e D15 (alçada pelo maior, centavos, fallback TP01, repetir sem desconto, preço 0). IA implementou T-01–T-09 com testes e números do seed; follow-ups na T-02 (string vazia, contrato D11).                                                                                                                                        |
 | API (rotas, validação, transações)         | IA gerou, eu revisei/alterei | Autor pediu 404 genérico (D14). T-13 usou 403 de carteira; PR [#33](https://github.com/Edu-Garcia/yandeh-pedidos/pull/33) unificou 404 para cliente/carteira alheios (inclui `GET /sellers/:id/customers`). Supervisor 404 (T-24), replay sem hash (T-16), data no fuso (D20). IA escreveu Fastify + Zod + `FOR UPDATE`; T-11b corrigiu ESM do shared. |
-| Telas (Vue)                                | IA gerou, eu revisei/alterei | Autor decidiu D9, D16–D18 (Unidades/Lote, sem id de produto, confirmação inline, rascunho pendente travado). IA gerou Vue 3 + Pinia + skill `frontend-design` (T-17–T-27).                                                                                                                                                                             |
+| Telas (Vue)                                | IA gerou, eu revisei/alterei | Autor decidiu D9, D16–D18 (Unidades/Lote, UI sem ids, confirmação inline, rascunho pendente travado). IA gerou Vue 3 + Pinia + skill `frontend-design` (T-17–T-27). D16 ampliada pós-entrega: cliente/vendedor/supervisor também sem id na tela.                                                                                                       |
 | Testes                                     | IA gerou, eu revisei/alterei | Autor definiu o aceite com ids do seed. IA escreveu Vitest (shared puro, API `app.inject`, web happy-dom). Casos extras depois das correções (virada de fuso, 404 genérico, trava do pendente).                                                                                                                                                        |
 | Documentação (PRD, DECISIONS, ASSUMPTIONS) | IA gerou, eu revisei/alterei | Rascunho inicial a partir das decisões do autor (T-00). D1–D20 marcadas **[autor]**; T-29 preencheu “com mais tempo”; PR #33 atualizou D14/A33 (404 da carteira). Autor revisou este `AI_LOG.md` no PR #34.                                                                                                                                            |
 | Scaffold / Docker / configuração           | IA gerou, eu revisei/alterei | Gerado na T-00 a partir das decisões D1–D5. Commits `607ef9f` e `b5776fc` no git estão no nome do autor; o restante da implementação está em commits `Cursor Agent`.                                                                                                                                                                                   |

@@ -49,7 +49,7 @@ Variáveis da API (ver `.env.example`, `apps/api/src/env.ts` e `docker-compose.y
 
 ### Usuários de teste (login simulado)
 
-Sem senha. Na tela "Quem é você?" a API lista o seed:
+Sem senha. Na tela "Quem é você?" a API lista o seed; a UI mostra **só o nome** (o id não aparece na tela; o do cliente permanece na URL `/clientes/:clientId/pedido`):
 
 | Papel      | Id  | Nome            | Alçada | Carteira / tela            |
 | ---------- | --- | --------------- | ------ | -------------------------- |
@@ -120,15 +120,16 @@ Arquivos em `packages/shared/src/*.test.ts`:
 - Carteira: formatação BRL, destaque abaixo do mínimo, renderização (T-18)
 - Pedido: debounce da busca, P009/P023, aviso de fallback, carrinho Unidades/Lote, totais/bloqueios/envio, histórico e repetir, rascunho em localStorage, retentativa idempotente (rede/5xx/offline; 422 não retenta)
 - Carrinho (T-33): componentes com Vue Test Utils — `CartLine` (Unidades/Lote, líquido da linha, remover, travado) e painel da `OrderPage` (totais C001, mínimo/crédito, alçada, rascunho vazio, envio pendente); API mockada; sem id de produto no texto
-- Aprovações do supervisor (lista, confirmar, 422 de crédito)
+- Carteira, "Quem é você?" e SessionBar: só nomes (sem `C00x` / `V0x` / `S01` no texto visível; id do cliente só na URL)
+- Aprovações do supervisor (lista, confirmar, 422 de crédito; SessionBar só com o nome)
 - Cliente HTTP (`X-Seller-Id` / `X-Supervisor-Id` / `Idempotency-Key`)
 
 ### e2e Playwright (`pnpm test:e2e`, banco `yandeh_e2e`)
 
 Viewport 390×844. Cobre o roteiro R1–R9 no browser (T-32):
 
-- Login/sessão do vendedor; carteira só com os clientes dele e **nome da tabela** (não o id `TP01`)
-- Cliente de outra carteira e rota inexistente → a mesma página 404, URL mantida
+- Login/sessão do vendedor; carteira só com os clientes dele e **nome da tabela** (não o id `TP01`); "Quem é você?", carteira e supervisor **não mostram** ids `C00x` / `V0x` / `S01`
+- Cliente de outra carteira e rota inexistente → a mesma página 404, URL mantida (`/clientes/:clientId/pedido` continua com o id)
 - Busca por descrição e EAN; a UI **não mostra** id de produto (`P009` etc.)
 - Carrinho Unidades/Lote, desconto, mínimo e crédito bloqueando Enviar
 - Envio Enviado / Aguardando aprovação; aprovação e rejeição do supervisor com confirmação inline

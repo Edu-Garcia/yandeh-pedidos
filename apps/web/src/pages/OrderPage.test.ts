@@ -337,6 +337,11 @@ describe('OrderPage', () => {
     expect(el.querySelector('[data-testid="fallback-warning"]')?.textContent).toContain(
       'Cliente sem tabela — usando Tabela Padrão',
     )
+    expect(el.textContent).not.toContain('C004')
+    expect(el.textContent).not.toContain('TP01')
+    expect(el.textContent, 'a UI não deve mostrar id de vendedor (ex.: V01)').not.toMatch(
+      /\bV0\d\b/,
+    )
   })
 
   it('não mostra o aviso de fallback no C001', async () => {
@@ -345,6 +350,11 @@ describe('OrderPage', () => {
     await waitForText(el, 'Mercadinho São José')
     expect(el.querySelector('[data-testid="fallback-warning"]')).toBeNull()
     expect(el.textContent).not.toContain('Cliente sem tabela — usando Tabela Padrão')
+    expect(el.textContent).not.toContain('C001')
+    expect(el.textContent, 'a UI não deve mostrar id de vendedor (ex.: V01)').not.toMatch(
+      /\bV0\d\b/,
+    )
+    expect(el.querySelector('[data-testid="session-actor"]')?.textContent).toBe('Carlos Menezes')
   })
 
   it('debounca a busca e só dispara uma requisição depois da pausa', async () => {

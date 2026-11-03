@@ -70,7 +70,7 @@ onMounted(() => {
         <section>
           <h2 class="mb-2 font-sans text-sm text-steel">Vendedores</h2>
           <ul class="divide-y divide-steel/40 border-y border-steel/40">
-            <li v-for="seller in sellers" :key="seller.id">
+            <li v-for="seller in sellers" :key="seller.id" :data-seller-id="seller.id">
               <button
                 type="button"
                 class="flex min-h-16 w-full items-center justify-between gap-3 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-safety"
@@ -79,7 +79,7 @@ onMounted(() => {
                 <span class="min-w-0">
                   <span class="block font-display text-xl text-counter">{{ seller.name }}</span>
                   <span class="block font-sans text-sm text-steel">
-                    {{ seller.id }}, desconto até {{ seller.discountAuthorityPercent }}%
+                    Desconto até {{ seller.discountAuthorityPercent }}%
                   </span>
                 </span>
                 <span class="font-sans text-sm text-produce">Entrar</span>
@@ -91,7 +91,11 @@ onMounted(() => {
         <section>
           <h2 class="mb-2 font-sans text-sm text-steel">Supervisor</h2>
           <ul class="border-l-4 border-safety bg-counter/95 text-receipt">
-            <li v-for="supervisor in supervisors" :key="supervisor.id">
+            <li
+              v-for="supervisor in supervisors"
+              :key="supervisor.id"
+              :data-supervisor-id="supervisor.id"
+            >
               <button
                 type="button"
                 class="flex min-h-16 w-full items-center justify-between gap-3 px-3 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-safety"
@@ -99,9 +103,7 @@ onMounted(() => {
               >
                 <span class="min-w-0">
                   <span class="block font-display text-xl">{{ supervisor.name }}</span>
-                  <span class="block font-sans text-sm text-receipt/70">
-                    {{ supervisor.id }}, aprova pedidos
-                  </span>
+                  <span class="block font-sans text-sm text-receipt/70">Aprova pedidos</span>
                 </span>
                 <span class="font-sans text-sm text-safety">Entrar</span>
               </button>

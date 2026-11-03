@@ -24,6 +24,9 @@ export const CUSTOMER = {
 } as const
 
 const PRODUCT_ID_RE = /\bP0\d{2}\b/
+const CUSTOMER_ID_RE = /\bC0\d{2}\b/
+const SELLER_ID_RE = /\bV0\d\b/
+const SUPERVISOR_ID_RE = /\bS0\d\b/
 
 export async function signInSeller(page: Page, name = 'Carlos Menezes'): Promise<void> {
   await page.goto('/')
@@ -80,6 +83,13 @@ export async function addExampleC001(page: Page): Promise<void> {
 export async function expectNoVisibleProductIds(page: Page): Promise<void> {
   const text = await page.locator('body').innerText()
   expect(text, 'a UI não deve mostrar id de produto (ex.: P009)').not.toMatch(PRODUCT_ID_RE)
+}
+
+export async function expectNoVisiblePersonIds(page: Page): Promise<void> {
+  const text = await page.locator('body').innerText()
+  expect(text, 'a UI não deve mostrar id de cliente (ex.: C001)').not.toMatch(CUSTOMER_ID_RE)
+  expect(text, 'a UI não deve mostrar id de vendedor (ex.: V01)').not.toMatch(SELLER_ID_RE)
+  expect(text, 'a UI não deve mostrar id de supervisor (ex.: S01)').not.toMatch(SUPERVISOR_ID_RE)
 }
 
 export async function snapshot(page: Page, name: string): Promise<void> {

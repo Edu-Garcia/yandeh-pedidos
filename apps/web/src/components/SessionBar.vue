@@ -10,8 +10,8 @@ const router = useRouter()
 
 const label = computed(() => {
   const actor = session.actor
-  if (actor?.kind === 'seller') return `${actor.seller.id} ${actor.seller.name}`
-  if (actor?.kind === 'supervisor') return `${actor.supervisor.id} ${actor.supervisor.name}`
+  if (actor?.kind === 'seller') return actor.seller.name
+  if (actor?.kind === 'supervisor') return actor.supervisor.name
   return ''
 })
 
@@ -25,7 +25,7 @@ function changeUser(): void {
   <header class="flex items-center justify-between gap-3 bg-counter px-4 py-3 text-receipt">
     <div class="min-w-0">
       <p class="font-display text-sm tracking-wide text-safety">Yandeh</p>
-      <p class="truncate font-sans text-base">{{ label }}</p>
+      <p data-testid="session-actor" class="truncate font-sans text-base">{{ label }}</p>
       <p
         data-testid="connection-status"
         class="mt-0.5 font-sans text-sm"

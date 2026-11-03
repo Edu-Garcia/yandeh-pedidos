@@ -192,6 +192,11 @@ describe('OrderPage — carrinho', () => {
     expect(page.text()).not.toContain('P006')
     expect(page.text()).not.toContain('P010')
     expect(page.text()).not.toContain('P009')
+    expect(page.text(), 'a UI não deve mostrar id de cliente (ex.: C001)').not.toMatch(
+      /\bC0\d{2}\b/,
+    )
+    expect(page.text(), 'a UI não deve mostrar id de vendedor (ex.: V01)').not.toMatch(/\bV0\d\b/)
+    expect(page.text(), 'a UI não deve mostrar id de supervisor (ex.: S01)').not.toMatch(/\bS0\d\b/)
   })
 
   it('bloqueia Enviar abaixo do mínimo e mostra a mensagem', async () => {

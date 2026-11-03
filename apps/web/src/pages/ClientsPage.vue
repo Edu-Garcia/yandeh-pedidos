@@ -84,7 +84,7 @@ onMounted(() => {
                 {{ customer.tradeName }}
               </span>
               <span class="mt-1 block font-sans text-sm text-steel">
-                {{ customer.id }}, {{ formatCityUf(customer.city, customer.uf) }}
+                {{ formatCityUf(customer.city, customer.uf) }}
               </span>
               <span class="mt-1 block font-sans text-sm text-steel">
                 {{ customer.priceTableName }}
