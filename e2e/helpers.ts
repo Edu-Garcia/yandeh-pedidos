@@ -92,12 +92,12 @@ export async function expectNoVisiblePersonIds(page: Page): Promise<void> {
   expect(text, 'a UI não deve mostrar id de supervisor (ex.: S01)').not.toMatch(SUPERVISOR_ID_RE)
 }
 
-export async function snapshot(page: Page, name: string): Promise<void> {
+export async function snapshot(page: Page, name: string, fullPage = true): Promise<void> {
   const dirs = ['/opt/cursor/artifacts/screenshots', path.join(REPO_ROOT, 'test-results/manual')]
   for (const dir of dirs) {
     try {
       mkdirSync(dir, { recursive: true })
-      await page.screenshot({ path: path.join(dir, `${name}.png`), fullPage: true })
+      await page.screenshot({ path: path.join(dir, `${name}.png`), fullPage })
     } catch {
       /* diretório indisponível neste ambiente */
     }

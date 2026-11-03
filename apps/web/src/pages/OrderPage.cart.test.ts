@@ -17,6 +17,7 @@ import OrderPage from './OrderPage.vue'
 const fetchSellerCustomers = vi.fn()
 const fetchCustomerProducts = vi.fn()
 const fetchCustomerOrders = vi.fn()
+const fetchCustomerOrder = vi.fn()
 const repeatCustomerOrder = vi.fn()
 
 vi.mock('@/api', async () => {
@@ -26,6 +27,7 @@ vi.mock('@/api', async () => {
     fetchSellerCustomers: (...args: unknown[]) => fetchSellerCustomers(...args),
     fetchCustomerProducts: (...args: unknown[]) => fetchCustomerProducts(...args),
     fetchCustomerOrders: (...args: unknown[]) => fetchCustomerOrders(...args),
+    fetchCustomerOrder: (...args: unknown[]) => fetchCustomerOrder(...args),
     repeatCustomerOrder: (...args: unknown[]) => repeatCustomerOrder(...args),
   }
 })
@@ -133,6 +135,7 @@ describe('OrderPage — carrinho', () => {
     fetchSellerCustomers.mockReset()
     fetchCustomerProducts.mockReset()
     fetchCustomerOrders.mockReset()
+    fetchCustomerOrder.mockReset()
     repeatCustomerOrder.mockReset()
     fetchCustomerOrders.mockResolvedValue([])
     fetchSellerCustomers.mockResolvedValue(v01Wallet)

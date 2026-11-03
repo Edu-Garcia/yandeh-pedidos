@@ -170,6 +170,38 @@ export const customerOrderSummarySchema = z.object({
 
 export const customerOrdersResponseSchema = z.array(customerOrderSummarySchema)
 
+/** Totais em centavos (RN07): bruto, desconto e líquido. */
+export const moneyTotalsSchema = z.object({
+  gross: z.number(),
+  discount: z.number(),
+  net: z.number(),
+})
+
+/**
+ * Linha do pedido histórico: preço/desconto congelados da época.
+ * `productId` é só chave interna (a UI não mostra).
+ */
+export const customerOrderDetailItemSchema = z.object({
+  productId: z.string(),
+  description: z.string(),
+  ean: z.string(),
+  /** Quantidade em unidades. */
+  quantity: z.number(),
+  /** Preço unitário congelado, em centavos. */
+  unitPrice: z.number(),
+  discountPercent: z.number(),
+  totals: moneyTotalsSchema,
+})
+
+/** Cabeçalho + linhas do pedido, com valores congelados (não o preço atual). */
+export const customerOrderDetailSchema = z.object({
+  id: z.string(),
+  date: z.string(),
+  status: customerOrderStatusSchema,
+  totals: moneyTotalsSchema,
+  items: z.array(customerOrderDetailItemSchema),
+})
+
 /**
  * Linha do repeat: `product` é o mesmo contrato da busca (T-13 / `CustomerProduct`)
  * para a T-23 reaproveitar o tipo do carrinho. `productId` é só chave interna.

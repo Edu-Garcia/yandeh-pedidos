@@ -51,6 +51,15 @@ async function waitForText(el: HTMLElement, snippet: string): Promise<void> {
   throw new Error(`Texto não apareceu: ${snippet}\nRecebido: ${el.textContent}`)
 }
 
+async function waitForRoute(router: ReturnType<typeof createRouter>, name: string): Promise<void> {
+  for (let attempt = 0; attempt < 40; attempt++) {
+    if (router.currentRoute.value.name === name) return
+    await nextTick()
+    await flush()
+  }
+  throw new Error(`Rota não chegou em ${name}: ${String(router.currentRoute.value.name)}`)
+}
+
 function expectNoVisiblePersonIds(text: string | null | undefined): void {
   expect(text, 'a UI não deve mostrar id de cliente (ex.: C001)').not.toMatch(/\bC0\d{2}\b/)
   expect(text, 'a UI não deve mostrar id de vendedor (ex.: V01)').not.toMatch(/\bV0\d\b/)
@@ -146,8 +155,7 @@ describe('SellerSelectPage', () => {
 
     const row = el.querySelector('[data-seller-id="V01"]')
     row?.querySelector('button')?.click()
-    await nextTick()
-    await flush()
+    await waitForRoute(router, 'clients')
 
     expect(useSessionStore().sellerId).toBe('V01')
     expect(router.currentRoute.value.name).toBe('clients')
@@ -161,8 +169,7 @@ describe('SellerSelectPage', () => {
 
     const row = el.querySelector('[data-supervisor-id="S01"]')
     row?.querySelector('button')?.click()
-    await nextTick()
-    await flush()
+    await waitForRoute(router, 'approvals')
 
     expect(useSessionStore().supervisorId).toBe('S01')
     expect(router.currentRoute.value.name).toBe('approvals')

@@ -118,6 +118,7 @@ Decisões marcadas **[autor]** foram tomadas pelo candidato (com os motivos dele
   - vendedor acessando `/supervisor/*` (sem `X-Supervisor-Id` válido) → o mesmo 404 de rota inexistente; não há 403 por papel;
   - pedido de outro cliente ou de outro time → 404 `Pedido não encontrado`, igual a inexistente (A33, A41);
   - cliente de outra carteira → o **mesmo 404** `{ message: 'Cliente não encontrado' }` de cliente inexistente (`findCustomerInSellerWallet`), em `GET /customers/:id/products`, `GET /customers/:id/orders`, `POST /customers/:id/orders/:orderId/repeat` e `POST /orders`;
+  - `GET /customers/:id/orders/:orderId`: cliente de outra carteira, cliente inexistente, pedido inexistente e pedido que não é desse cliente → o **mesmo 404** `{ message: 'Pedido não encontrado' }` (A55). A carteira ainda passa por `findCustomerInSellerWallet`; o corpo não distingue os quatro casos. Header ausente continua **400**;
   - `GET /sellers/:id/customers` com `X-Seller-Id` diferente do `:id` → o **mesmo 404** `{ message: 'Vendedor não encontrado' }` de vendedor inexistente. Header ausente continua **400** (igual às outras rotas do vendedor; não distingue se o `:id` existe).
 - **Por quê:** não revelar quais URLs e recursos existem. Um 403 de carteira ensinaria que o id do cliente existe na carteira de outro vendedor. O replay da `Idempotency-Key` só roda depois da carteira, para um 409 não vazar que a chave existe (T-16).
 - **Com mais tempo:** autenticação real (fora do PRD §5.2) substituiria o mascaramento por sessão e papéis de verdade.
@@ -185,3 +186,11 @@ Decisões marcadas **[autor]** foram tomadas pelo candidato (com os motivos dele
 - **Escolha:** banco `yandeh_e2e` (ou `E2E_DATABASE_URL`), criado/migrado no `globalSetup` e reseedado a cada teste — o mesmo `TRUNCATE … CASCADE` + seed da D21. API em `127.0.0.1:3334` e Vite em `127.0.0.1:5174` via `webServer` do Playwright. Só Chromium, viewport 390×844. `pnpm test:e2e` separado do `pnpm test`. `workers: 1`. Não há CI no repositório; se for adicionado, cachear `~/.cache/ms-playwright` e rodar `pnpm test:e2e:install`.
 - **Por quê:** a suíte fica repetível e em qualquer ordem, convive com o app de dev, e quem clona sem browser não quebra o pipeline de Vitest.
 - **Com mais tempo:** workflow de CI com cache de browsers; um Postgres efêmero só do job; rodar o e2e contra o build de produção (`vite preview`) além do dev server.
+
+## D23 — Visualizar pedido do histórico em painel/modal [autor]
+
+- **Contexto:** o vendedor precisa ver os itens e os valores de um pedido já enviado sem sair da tela de montagem (`OrderPage`). A listagem só traz data, status e total líquido; os itens ficam numa rota nova `GET /customers/:id/orders/:orderId`.
+- **Alternativas:** (a) expandir a linha inline na lista; (b) página/rota própria (`/clientes/:id/pedidos/:orderId`); (c) painel/modal sobre a tela atual.
+- **Escolha:** (c) painel/modal (decisão do autor). Título com data + status; lista de itens (descrição, EAN, quantidade, preço unitário, desconto, líquido da linha) e totais bruto/desconto/líquido; fecha por botão, Esc e clique fora; foco preso no diálogo e devolvido ao botão "Visualizar pedido".
+- **Por quê:** o histórico já é seção da tela de pedido, não rota nova (A37). O painel mantém o rascunho visível (inclusive travado) e cabe no viewport 390×844 sem alongar a lista. Expandir inline misturaria o histórico com o rascunho e empurraria o carrinho para baixo no celular. Uma página própria exigiria rota nova, perderia o contexto do rascunho e quebraria a navegação carteira → um único pedido do cliente.
+- **Com mais tempo:** snapshot de descrição/EAN na linha do pedido (hoje vêm do cadastro atual; inativos ainda existem no seed). Desfazer o painel em gaveta persistente se o vendedor passar a consultar vários pedidos seguidos.

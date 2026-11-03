@@ -454,6 +454,19 @@ Validação comum: `pnpm --filter @yandeh/web typecheck && pnpm --filter @yandeh
 - **Commit:** `fix(web): exibir apenas nomes, sem ids, na UI`
 - **Status:** feito
 
+### [x] T-36 — Visualizar itens de pedido do histórico (painel/modal)
+
+- **Refs:** PRD §7.4, §8; D14, D16, D23; A15, A16, A37, A55–A57.
+- **Depende de:** T-23
+- **Escopo:** `GET /customers/:id/orders/:orderId` (header `X-Seller-Id`) devolve cabeçalho (data, status, totais bruto/desconto/líquido) e linhas com valores **congelados** (descrição, EAN, quantidade em unidades, preço unitário, desconto %, bruto, desconto e líquido da linha), inclusive produtos hoje inativos. Schemas Zod; testes `app.inject` no `yandeh_test` cobrindo PH001/C001 e os 404. Na `OrderPage`, botão "Visualizar pedido" abre painel/modal mobile-first (390×844) com `role="dialog"`, `aria-modal`, `aria-labelledby`; fecha por botão, Esc e clique fora; foco preso e devolvido ao gatilho. Estados de carregando e erro (tentar de novo). Só leitura (não mexe no carrinho, funciona com rascunho travado). UI sem ids. Formatação `formatBRL` / `formatCivilDate`. VTU do painel + e2e Playwright. "Repetir pedido" no painel reusa o fluxo existente.
+- **Fora:** editar o seed; rota/página própria; expandir inline; snapshot novo de descrição no banco.
+- **Aceite:** PH001 mostra arroz a R$ 25,90 (não R$ 26,90), macarrão 2%, leite e o biscoito inativo; totais 58566 / 263 / 58303. Os quatro 404 (outra carteira, cliente inexistente, pedido inexistente, pedido de outro cliente) têm o mesmo corpo `{ message: 'Pedido não encontrado' }`; header ausente → 400. A UI não mostra `PH001` / `P022`.
+- **Validação:** `pnpm test && pnpm typecheck && pnpm lint && pnpm format:check && pnpm test:e2e`
+- **Validação manual:** Logar V01, abrir C001, histórico → botão "Visualizar pedido" em cada linha. Abrir PH001 (15/09/2026, Faturado) no viewport 390×844: itens (Arroz, Macarrão, Leite, Biscoito Recheado Chocolate 140g) com preço congelado e totais; fechar com Fechar / Esc / clique fora. Rascunho travado continua só leitura. Evidência: screenshots 390×844 do histórico com o botão e do painel aberto.
+- **Docs:** D23; A55–A57; D14; PRD §7.4 e §8; README (rota e testes); AI_LOG.
+- **Commit:** `feat: visualizar itens de pedido do histórico`
+- **Status:** feito
+
 ### [ ] T-34 — (opcional) Cache do catálogo do cliente para busca offline
 
 - **Depende de:** T-27 · **Escopo:** cache da última busca/carteira em IndexedDB, com aviso de preço possivelmente desatualizado (servidor revalida no envio).

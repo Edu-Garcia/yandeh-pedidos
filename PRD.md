@@ -183,7 +183,7 @@ O front gera um UUID por rascunho e envia em `Idempotency-Key`. A API grava a ch
 1. **Quem é você?** — escolher pelo **nome** o vendedor (V01/V02/V03) ou a supervisora S01 (login simulado; a UI não mostra os ids). Sem sessão, qualquer URL (existente ou não) redireciona para `/`. Com sessão, rota de outro papel ou URL inexistente mostra o mesmo 404 ("Página não encontrada") **sem mudar a URL** [Decisão do autor].
 2. **Minha carteira** — clientes do vendedor com **nome**, cidade/UF (sem o id `C001`), **nome da tabela** efetiva (não o id `TP01`; badge "Padrão (fallback)" no C004) e crédito disponível (destaque quando insuficiente para o mínimo, ex.: C006, C010). O id do cliente permanece só na URL `/clientes/:clientId/pedido`.
 3. **Pedido do cliente** — busca (nome/EAN; scanner fica fora), resultados com **descrição, EAN e preço** (a UI nunca mostra o id do produto); carrinho com campos interligados Unidades e Lote (CX/FD; Unidades somente leitura quando só por lote), desconto %; painel fixo de totais; lista de bloqueios (mínimo, crédito, quantidade inválida) e aviso "precisará de aprovação"; botão **Enviar** desabilitado quando há bloqueio; indicador de rascunho salvo/offline; rascunho pendente de envio **travado** para edição.
-4. **Histórico do cliente** — últimos pedidos (data, status, total) e "Repetir pedido". Avisos de item removido usam a **descrição**, nunca o id do produto.
+4. **Histórico do cliente** — últimos pedidos (data, status, total), **"Visualizar pedido"** (painel/modal com itens e valores congelados) e "Repetir pedido". Avisos de item removido usam a **descrição**, nunca o id do produto. A UI não mostra o id do pedido (`PH001`). [D23]
 5. **Aprovações (supervisor)** — lista de pendentes com vendedor, cliente, maior desconto vs alçada, total; **Aprovar/Rejeitar com confirmação inline** (ações definitivas) [Decisão do autor].
 
 ## 8. API (esboço)
@@ -196,6 +196,7 @@ O front gera um UUID por rascunho e envia em `Idempotency-Key`. A API grava a ch
 | GET    | `/sellers/:id/customers`                            | Carteira com crédito disponível e tabela efetiva |
 | GET    | `/customers/:id/products?q=`                        | Busca por nome/EAN com preço da tabela efetiva   |
 | GET    | `/customers/:id/orders`                             | Histórico                                        |
+| GET    | `/customers/:id/orders/:orderId`                    | Detalhe com itens e valores congelados           |
 | POST   | `/customers/:id/orders/:orderId/repeat`             | Monta itens para revisão (não cria pedido)       |
 | POST   | `/orders` (header `Idempotency-Key`, `X-Seller-Id`) | Valida no servidor e cria pedido                 |
 | GET    | `/supervisor/orders?status=Aguardando aprovação`    | Pendentes                                        |

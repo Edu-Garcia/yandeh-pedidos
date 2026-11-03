@@ -5,6 +5,7 @@ import {
   apiErrorFromBody,
   approveSupervisorOrder,
   createOrder,
+  fetchCustomerOrder,
   fetchCustomerOrders,
   fetchCustomerProducts,
   fetchPendingSupervisorOrders,
@@ -145,6 +146,37 @@ describe('fetchCustomerOrders', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(url).toBe('http://localhost:3333/customers/C001/orders')
+    expect(init.method ?? 'GET').toBe('GET')
+    expect(new Headers(init.headers).get('X-Seller-Id')).toBe('V01')
+  })
+})
+
+describe('fetchCustomerOrder', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    setActivePinia(createPinia())
+    vi.unstubAllGlobals()
+  })
+
+  it('chama GET /customers/:id/orders/:orderId com X-Seller-Id', async () => {
+    useSessionStore().signInSeller(carlos)
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        id: 'PH001',
+        date: '2026-09-15',
+        status: 'Faturado',
+        totals: { gross: 58566, discount: 263, net: 58303 },
+        items: [],
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchCustomerOrder('C001', 'PH001')
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('http://localhost:3333/customers/C001/orders/PH001')
     expect(init.method ?? 'GET').toBe('GET')
     expect(new Headers(init.headers).get('X-Seller-Id')).toBe('V01')
   })
