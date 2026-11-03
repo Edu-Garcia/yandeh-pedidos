@@ -1,10 +1,10 @@
 import type { CustomerProduct, SellerCustomer } from '@yandeh/shared'
-import { formatBRL, orderTotals } from '@yandeh/shared'
+import { formatBRL, lineTotals, orderTotals } from '@yandeh/shared'
 import { createPinia, setActivePinia } from 'pinia'
 import { createApp, nextTick, type App } from 'vue'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, type RepeatDraftResponse } from '@/api'
+import { ApiError, type CustomerOrderDetail, type RepeatDraftResponse } from '@/api'
 import { PRODUCT_SEARCH_DEBOUNCE_MS } from '@/product-search'
 import { DRAFT_LOCKED_MESSAGE } from '@/submit-retry'
 import { routes } from '@/router'
@@ -21,6 +21,7 @@ import OrderPage from './OrderPage.vue'
 const fetchSellerCustomers = vi.fn()
 const fetchCustomerProducts = vi.fn()
 const fetchCustomerOrders = vi.fn()
+const fetchCustomerOrder = vi.fn()
 const repeatCustomerOrder = vi.fn()
 
 vi.mock('@/api', async () => {
@@ -30,6 +31,7 @@ vi.mock('@/api', async () => {
     fetchSellerCustomers: (...args: unknown[]) => fetchSellerCustomers(...args),
     fetchCustomerProducts: (...args: unknown[]) => fetchCustomerProducts(...args),
     fetchCustomerOrders: (...args: unknown[]) => fetchCustomerOrders(...args),
+    fetchCustomerOrder: (...args: unknown[]) => fetchCustomerOrder(...args),
     repeatCustomerOrder: (...args: unknown[]) => repeatCustomerOrder(...args),
   }
 })
@@ -295,6 +297,7 @@ describe('OrderPage', () => {
     fetchSellerCustomers.mockReset()
     fetchCustomerProducts.mockReset()
     fetchCustomerOrders.mockReset()
+    fetchCustomerOrder.mockReset()
     repeatCustomerOrder.mockReset()
     fetchCustomerOrders.mockResolvedValue([])
   })
@@ -1287,6 +1290,7 @@ describe('OrderPage', () => {
     expect(ph001.textContent).toContain('15/09/2026')
     expect(ph001.textContent).toContain('Faturado')
     expect(normalizeBRL(ph001.textContent ?? '')).toContain(normalizeBRL(formatBRL(ph001Total)))
+    expect(ph001.textContent).toContain('Visualizar pedido')
     expect(ph001.textContent).toContain('Repetir')
 
     const ph002 = historyRow(el, 'PH002')
@@ -1516,6 +1520,119 @@ describe('OrderPage', () => {
     await waitForText(el, 'Página não encontrada')
     expect(el.textContent).toContain('Esse endereço não existe')
     expect(router?.currentRoute.value.path).toBe('/clientes/C001/pedido')
+  })
+
+  const ph001Detail: CustomerOrderDetail = {
+    id: 'PH001',
+    date: '2026-09-15',
+    status: 'Faturado',
+    totals: { gross: 58566, discount: 263, net: ph001Total },
+    items: [
+      {
+        productId: 'P001',
+        description: 'Arroz Branco Tipo 1 5kg',
+        ean: '7891958224128',
+        quantity: 10,
+        unitPrice: 2590,
+        discountPercent: 0,
+        totals: lineTotals({
+          productId: 'P001',
+          quantityUnits: 10,
+          unitPrice: 2590,
+          discountPercent: 0,
+        }),
+      },
+      {
+        productId: 'P006',
+        description: 'Macarrão Espaguete 500g',
+        ean: '7891399588384',
+        quantity: 40,
+        unitPrice: 329,
+        discountPercent: 2,
+        totals: lineTotals({
+          productId: 'P006',
+          quantityUnits: 40,
+          unitPrice: 329,
+          discountPercent: 2,
+        }),
+      },
+      {
+        productId: 'P010',
+        description: 'Leite UHT Integral 1L',
+        ean: '7891216687320',
+        quantity: 24,
+        unitPrice: 489,
+        discountPercent: 0,
+        totals: lineTotals({
+          productId: 'P010',
+          quantityUnits: 24,
+          unitPrice: 489,
+          discountPercent: 0,
+        }),
+      },
+      {
+        productId: 'P022',
+        description: 'Biscoito Recheado Chocolate 140g',
+        ean: '7891366875370',
+        quantity: 30,
+        unitPrice: 259,
+        discountPercent: 0,
+        totals: lineTotals({
+          productId: 'P022',
+          quantityUnits: 30,
+          unitPrice: 259,
+          discountPercent: 0,
+        }),
+      },
+    ],
+  }
+
+  it('abre o painel do histórico com os itens congelados do PH001', async () => {
+    fetchCustomerOrder.mockResolvedValue(ph001Detail)
+    const el = await openC001WithHistory()
+    const view = historyRow(el, 'PH001').querySelector(
+      '[data-testid="view-order"]',
+    ) as HTMLButtonElement
+    view.click()
+    await waitFor(document.body, (text) => text.includes('Biscoito Recheado Chocolate 140g'))
+
+    expect(fetchCustomerOrder).toHaveBeenCalledWith('C001', 'PH001')
+    const panel = document.body.querySelector('[data-testid="order-history-panel"]')
+    expect(panel).not.toBeNull()
+    expect(panel?.getAttribute('role')).toBe('dialog')
+    expect(normalizeBRL(panel?.textContent ?? '')).toContain(normalizeBRL(formatBRL(ph001Total)))
+    expect(panel?.textContent).toContain('Arroz Branco Tipo 1 5kg')
+    expect(document.body.textContent).not.toContain('PH001')
+    expect(document.body.textContent).not.toContain('P022')
+    expect(el.querySelector('[data-testid="cart-empty"]')).not.toBeNull()
+  })
+
+  it('com rascunho travado, visualizar o pedido não mexe no carrinho', async () => {
+    fetchCustomerOrder.mockResolvedValue(ph001Detail)
+    fetchCustomerOrders.mockResolvedValue(c001History)
+    fetchSellerCustomers.mockResolvedValue(v01Wallet)
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    const el = await render('C001')
+    await waitForText(el, 'Mercadinho São José')
+    await addExampleC001(el)
+    useOnlineStore().setOnline(false)
+    sendButton(el).click()
+    await waitForText(el, 'Aguardando conexão')
+
+    const view = historyRow(el, 'PH001').querySelector(
+      '[data-testid="view-order"]',
+    ) as HTMLButtonElement
+    view.click()
+    await waitFor(document.body, (text) => text.includes('Biscoito Recheado Chocolate 140g'))
+    expect(repeatCustomerOrder).not.toHaveBeenCalled()
+    expect(persistedDraft('C001')?.lines).toHaveLength(3)
+    expect(document.body.querySelector('[data-testid="order-history-repeat"]')).not.toBeNull()
+    expect(
+      (document.body.querySelector('[data-testid="order-history-repeat"]') as HTMLButtonElement)
+        .disabled,
+    ).toBe(true)
   })
 
   it('mostra o mesmo 404 quando o repeat responde 404, sem mudar a URL', async () => {

@@ -172,8 +172,41 @@ export interface RepeatDraftResponse {
   notices: RepeatNotice[]
 }
 
+export interface CustomerOrderLineTotals {
+  gross: number
+  discount: number
+  net: number
+}
+
+export interface CustomerOrderDetailItem {
+  /** Chave interna; a UI não mostra. */
+  productId: string
+  description: string
+  ean: string
+  quantity: number
+  unitPrice: number
+  discountPercent: number
+  totals: CustomerOrderLineTotals
+}
+
+export interface CustomerOrderDetail {
+  id: string
+  date: string
+  status: CustomerOrderStatus
+  totals: CustomerOrderLineTotals
+  items: CustomerOrderDetailItem[]
+}
+
 export function fetchCustomerOrders(customerId: string): Promise<CustomerOrderSummary[]> {
   return apiRequest<CustomerOrderSummary[]>(`/customers/${customerId}/orders`)
+}
+
+/** Pedido histórico com itens e valores congelados. */
+export function fetchCustomerOrder(
+  customerId: string,
+  orderId: string,
+): Promise<CustomerOrderDetail> {
+  return apiRequest<CustomerOrderDetail>(`/customers/${customerId}/orders/${orderId}`)
 }
 
 /** Monta o rascunho para revisão. Não cria pedido (RN12). */

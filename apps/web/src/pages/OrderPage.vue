@@ -6,21 +6,24 @@ import {
   type SellerCustomer,
   type ValidationIssue,
 } from '@yandeh/shared'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import {
   ApiError,
   createOrder,
+  fetchCustomerOrder,
   fetchCustomerOrders,
   fetchCustomerProducts,
   fetchSellerCustomers,
   isHiddenResourceError,
   repeatCustomerOrder,
   type CreatedOrder,
+  type CustomerOrderDetail,
   type CustomerOrderSummary,
   type RepeatNotice,
   type RepeatRemovedItem,
 } from '@/api'
 import CartLine from '@/components/CartLine.vue'
+import OrderHistoryPanel from '@/components/OrderHistoryPanel.vue'
 import SessionBar from '@/components/SessionBar.vue'
 import { formatCivilDate, formatRemovedItem } from '@/order-history'
 import { PRODUCT_SEARCH_DEBOUNCE_MS } from '@/product-search'
@@ -66,6 +69,13 @@ const repeatError = ref<string | null>(null)
 const removedItems = ref<RepeatRemovedItem[]>([])
 const repeatNotices = ref<RepeatNotice[]>([])
 const repeatLoaded = ref(false)
+
+const viewingOrderId = ref<string | null>(null)
+const viewingSummary = ref<CustomerOrderSummary | null>(null)
+const viewingOrder = ref<CustomerOrderDetail | null>(null)
+const viewingLoading = ref(false)
+const viewingError = ref<string | null>(null)
+let viewTriggerEl: HTMLElement | null = null
 
 const cartLines = computed(() => draft.linesOf(props.clientId))
 const noticeByProductId = computed(() => {
@@ -150,11 +160,20 @@ function resetRepeatState(): void {
   repeatLoaded.value = false
 }
 
+function resetViewingState(): void {
+  viewingOrderId.value = null
+  viewingSummary.value = null
+  viewingOrder.value = null
+  viewingLoading.value = false
+  viewingError.value = null
+}
+
 function resetHistoryState(): void {
   orders.value = []
   historyLoading.value = false
   historyError.value = null
   resetRepeatState()
+  resetViewingState()
 }
 
 async function loadCustomer(): Promise<void> {
@@ -247,6 +266,51 @@ function requestRepeat(orderId: string): void {
   }
   pendingOverwriteOrderId.value = null
   void runRepeat(orderId)
+}
+
+async function loadOrderDetail(orderId: string): Promise<void> {
+  viewingLoading.value = true
+  viewingError.value = null
+  viewingOrder.value = null
+  try {
+    viewingOrder.value = await fetchCustomerOrder(props.clientId, orderId)
+  } catch (error) {
+    if (isHiddenResourceError(error)) {
+      resetViewingState()
+      notFound.value = true
+      return
+    }
+    viewingError.value =
+      error instanceof ApiError && error.message
+        ? error.message
+        : 'Não deu para carregar o pedido. Confira a API e tente de novo.'
+  } finally {
+    viewingLoading.value = false
+  }
+}
+
+function openOrderView(order: CustomerOrderSummary, event: MouseEvent): void {
+  viewTriggerEl = event.currentTarget as HTMLElement
+  viewingOrderId.value = order.id
+  viewingSummary.value = order
+  void loadOrderDetail(order.id)
+}
+
+async function closeOrderView(): Promise<void> {
+  resetViewingState()
+  await nextTick()
+  viewTriggerEl?.focus()
+}
+
+function retryOrderView(): void {
+  const orderId = viewingOrderId.value
+  if (orderId) void loadOrderDetail(orderId)
+}
+
+function repeatFromPanel(): void {
+  const orderId = viewingOrderId.value
+  void closeOrderView()
+  if (orderId) requestRepeat(orderId)
 }
 
 function cancelOverwrite(): void {
@@ -555,20 +619,30 @@ onUnmounted(() => {
                   {{ formatBRL(order.total) }}
                 </span>
               </div>
-              <button
-                type="button"
-                data-testid="repeat-order"
-                :disabled="repeating || isSubmitPending"
-                class="mt-3 min-h-12 border-b-2 px-1 font-sans text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-safety disabled:border-steel disabled:text-steel"
-                :class="
-                  repeating || isSubmitPending
-                    ? 'border-steel text-steel'
-                    : 'border-produce text-produce'
-                "
-                @click="requestRepeat(order.id)"
-              >
-                {{ repeating ? 'Repetindo…' : 'Repetir' }}
-              </button>
+              <div class="mt-3 flex flex-wrap gap-4">
+                <button
+                  type="button"
+                  data-testid="view-order"
+                  class="min-h-12 border-b-2 border-produce px-1 font-sans text-base text-produce focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-safety"
+                  @click="openOrderView(order, $event)"
+                >
+                  Visualizar pedido
+                </button>
+                <button
+                  type="button"
+                  data-testid="repeat-order"
+                  :disabled="repeating || isSubmitPending"
+                  class="min-h-12 border-b-2 px-1 font-sans text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-safety disabled:border-steel disabled:text-steel"
+                  :class="
+                    repeating || isSubmitPending
+                      ? 'border-steel text-steel'
+                      : 'border-produce text-produce'
+                  "
+                  @click="requestRepeat(order.id)"
+                >
+                  {{ repeating ? 'Repetindo…' : 'Repetir' }}
+                </button>
+              </div>
 
               <div
                 v-if="pendingOverwriteOrderId === order.id"
@@ -830,5 +904,18 @@ onUnmounted(() => {
         {{ sendLabel }}
       </button>
     </footer>
+
+    <OrderHistoryPanel
+      :open="viewingOrderId !== null"
+      :date="viewingSummary?.date ?? ''"
+      :status="viewingSummary?.status ?? ''"
+      :order="viewingOrder"
+      :loading="viewingLoading"
+      :error="viewingError"
+      :can-repeat="!isSubmitPending && !repeating"
+      @close="closeOrderView"
+      @retry="retryOrderView"
+      @repeat="repeatFromPanel"
+    />
   </div>
 </template>

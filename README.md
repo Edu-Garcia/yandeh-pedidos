@@ -3,7 +3,7 @@
 Módulo de montagem de pedidos para vendedores externos. Requisitos e regras: [`PRD.md`](PRD.md).
 Decisões: [`DECISIONS.md`](DECISIONS.md) · Assunções: [`ASSUMPTIONS.md`](ASSUMPTIONS.md) · Uso de IA: [`AI_LOG.md`](AI_LOG.md) · Plano de tarefas: [`TASKS.md`](TASKS.md).
 
-> **Status:** Tarefas obrigatórias T-00–T-31 concluídas (F0–F8; req. 1–8 e V1 do req. 9: rascunho local + reenvio idempotente). Opcionais T-32 (e2e Playwright dos fluxos R1–R9) e T-33 (componentes VTU do carrinho) feitos. T-34 não feito.
+> **Status:** Tarefas obrigatórias T-00–T-31 concluídas (F0–F8; req. 1–8 e V1 do req. 9: rascunho local + reenvio idempotente). Opcionais T-32 (e2e Playwright dos fluxos R1–R9) e T-33 (componentes VTU do carrinho) feitos. Correções T-35 (UI sem ids) e T-36 (visualizar pedido do histórico) feitas. T-34 não feito.
 >
 > O desafio foi entregue ao recrutador em 26/10/2026 com o repositório incompleto. O estado no prazo é o commit [`af003cc`](https://github.com/Edu-Garcia/yandeh-pedidos/tree/af003cc9b2f8b06639fb757cd27388568e8a2c51) (merge do PR #25, T-22): no `TASKS.md` daquele commit, T-00–T-22 estavam `[x]` (F0–F4 e a API de histórico/repetir; 25 de 34). Depois do prazo: tela de histórico (T-23), supervisor (T-24/T-25) e offline parcial V1 (T-26/T-27).
 
@@ -110,7 +110,7 @@ Arquivos em `packages/shared/src/*.test.ts`:
 - Carteira `GET /sellers/:id/customers` (crédito, fallback; outro vendedor = mesmo 404 de inexistente; sem header 400)
 - Busca `GET /customers/:id/products?q=` (nome/EAN, só vendáveis; outra carteira = mesmo 404 de inexistente)
 - `POST /orders` — Zod + `validateOrder`; exemplo C001 → 201 Enviado 51.930; alçada → Aguardando aprovação; 422 de regra; crédito com `FOR UPDATE` e corrida; `Idempotency-Key` (reenvio 200, sem header 400); data civil no fuso do negócio; outra carteira = mesmo 404 de inexistente
-- Histórico `GET /customers/:id/orders` e `POST .../repeat` (não cria pedido; PH004 Cancelado; outra carteira = mesmo 404 de inexistente)
+- Histórico `GET /customers/:id/orders`, `GET /customers/:id/orders/:orderId` (itens e valores congelados, inclusive inativos; PH001 do C001) e `POST .../repeat` (não cria pedido; PH004 Cancelado). Listagem: outra carteira = mesmo 404 de cliente inexistente. Detalhe: outra carteira, cliente inexistente, pedido inexistente e pedido de outro cliente = o mesmo 404 `Pedido não encontrado`
 - Supervisor `GET /supervisor/orders` e `POST .../approve|reject` (reserva ↔ utilizado, 409, 422 de crédito)
 - `shared-runtime` — import ESM de `lineTotals` em runtime
 
@@ -118,7 +118,7 @@ Arquivos em `packages/shared/src/*.test.ts`:
 
 - Sessão Pinia e guard de rota/papel (T-17)
 - Carteira: formatação BRL, destaque abaixo do mínimo, renderização (T-18)
-- Pedido: debounce da busca, P009/P023, aviso de fallback, carrinho Unidades/Lote, totais/bloqueios/envio, histórico e repetir, rascunho em localStorage, retentativa idempotente (rede/5xx/offline; 422 não retenta)
+- Pedido: debounce da busca, P009/P023, aviso de fallback, carrinho Unidades/Lote, totais/bloqueios/envio, histórico, visualizar pedido (painel/modal com itens congelados) e repetir, rascunho em localStorage, retentativa idempotente (rede/5xx/offline; 422 não retenta)
 - Carrinho (T-33): componentes com Vue Test Utils — `CartLine` (Unidades/Lote, líquido da linha, remover, travado) e painel da `OrderPage` (totais C001, mínimo/crédito, alçada, rascunho vazio, envio pendente); API mockada; sem id de produto no texto
 - Carteira, "Quem é você?" e SessionBar: só nomes (sem `C00x` / `V0x` / `S01` no texto visível; id do cliente só na URL)
 - Aprovações do supervisor (lista, confirmar, 422 de crédito; SessionBar só com o nome)
@@ -133,7 +133,7 @@ Viewport 390×844. Cobre o roteiro R1–R9 no browser (T-32):
 - Busca por descrição e EAN; a UI **não mostra** id de produto (`P009` etc.)
 - Carrinho Unidades/Lote, desconto, mínimo e crédito bloqueando Enviar
 - Envio Enviado / Aguardando aprovação; aprovação e rejeição do supervisor com confirmação inline
-- Repetir pedido; rascunho sobrevivendo ao reload; offline com "Aguardando conexão" e um único envio ao voltar a rede (`context.setOffline`)
+- Repetir pedido; visualizar pedido do histórico (painel/modal do PH001); rascunho sobrevivendo ao reload; offline com "Aguardando conexão" e um único envio ao voltar a rede (`context.setOffline`)
 
 ## Banco de dados
 

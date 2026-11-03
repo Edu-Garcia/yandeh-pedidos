@@ -983,6 +983,120 @@ describe('GET /customers/:id/orders', () => {
   })
 })
 
+describe('GET /customers/:id/orders/:orderId', () => {
+  beforeEach(resetOrdersAndCredit)
+  afterEach(resetOrdersAndCredit)
+
+  const ph001Items = [
+    {
+      productId: 'P001',
+      description: 'Arroz Branco Tipo 1 5kg',
+      ean: '7891958224128',
+      quantity: 10,
+      unitPrice: 2590,
+      discountPercent: 0,
+      totals: { gross: 25900, discount: 0, net: 25900 },
+    },
+    {
+      productId: 'P006',
+      description: 'Macarrão Espaguete 500g',
+      ean: '7891399588384',
+      quantity: 40,
+      unitPrice: 329,
+      discountPercent: 2,
+      totals: { gross: 13160, discount: 263, net: 12897 },
+    },
+    {
+      productId: 'P010',
+      description: 'Leite UHT Integral 1L',
+      ean: '7891216687320',
+      quantity: 24,
+      unitPrice: 489,
+      discountPercent: 0,
+      totals: { gross: 11736, discount: 0, net: 11736 },
+    },
+    {
+      productId: 'P022',
+      description: 'Biscoito Recheado Chocolate 140g',
+      ean: '7891366875370',
+      quantity: 30,
+      unitPrice: 259,
+      discountPercent: 0,
+      totals: { gross: 7770, discount: 0, net: 7770 },
+    },
+  ]
+
+  it('PH001 devolve cabeçalho e linhas com valores congelados, inclusive o biscoito inativo', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({
+      method: 'GET',
+      url: '/customers/C001/orders/PH001',
+      headers: { 'x-seller-id': 'V01' },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual({
+      id: 'PH001',
+      date: '2026-09-15',
+      status: 'Faturado',
+      totals: orderTotals(historyPH001Lines),
+      items: ph001Items,
+    })
+    expect(res.json().totals).toEqual({ gross: 58566, discount: 263, net: 58303 })
+    const rice = (
+      res.json() as { items: Array<{ productId: string; unitPrice: number }> }
+    ).items.find((item) => item.productId === 'P001')
+    expect(rice?.unitPrice).toBe(2590)
+    const biscuit = (
+      res.json() as { items: Array<{ productId: string; description: string }> }
+    ).items.find((item) => item.productId === 'P022')
+    expect(biscuit?.description).toBe('Biscoito Recheado Chocolate 140g')
+    await app.close()
+  })
+
+  it('cliente de outra carteira, cliente inexistente, pedido inexistente e pedido de outro cliente dão o mesmo 404', async () => {
+    const app = buildApp(db)
+    const otherWallet = await app.inject({
+      method: 'GET',
+      url: '/customers/C005/orders/PH003',
+      headers: { 'x-seller-id': 'V01' },
+    })
+    const missingCustomer = await app.inject({
+      method: 'GET',
+      url: '/customers/C999/orders/PH001',
+      headers: { 'x-seller-id': 'V01' },
+    })
+    const missingOrder = await app.inject({
+      method: 'GET',
+      url: '/customers/C001/orders/PH999',
+      headers: { 'x-seller-id': 'V01' },
+    })
+    const otherCustomerOrder = await app.inject({
+      method: 'GET',
+      url: '/customers/C001/orders/PH004',
+      headers: { 'x-seller-id': 'V01' },
+    })
+
+    expect(missingCustomer.statusCode).toBe(404)
+    expect(missingCustomer.json()).toEqual({ message: 'Pedido não encontrado' })
+    expect(otherWallet.statusCode).toBe(missingCustomer.statusCode)
+    expect(otherWallet.json()).toEqual(missingCustomer.json())
+    expect(missingOrder.statusCode).toBe(missingCustomer.statusCode)
+    expect(missingOrder.json()).toEqual(missingCustomer.json())
+    expect(otherCustomerOrder.statusCode).toBe(missingCustomer.statusCode)
+    expect(otherCustomerOrder.json()).toEqual(missingCustomer.json())
+    await app.close()
+  })
+
+  it('sem X-Seller-Id retorna 400', async () => {
+    const app = buildApp(db)
+    const res = await app.inject({ method: 'GET', url: '/customers/C001/orders/PH001' })
+    expect(res.statusCode).toBe(400)
+    expect(res.json()).toEqual({ message: 'Cabeçalho X-Seller-Id é obrigatório' })
+    await app.close()
+  })
+})
+
 describe('POST /customers/:id/orders/:orderId/repeat', () => {
   beforeEach(async () => {
     await restoreSeedPackFactors()

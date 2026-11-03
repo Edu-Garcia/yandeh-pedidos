@@ -63,6 +63,15 @@
 
 ---
 
+## Correção pós-entrega — visualizar pedido do histórico em painel/modal
+
+> **[RASCUNHO]** O autor revisa se entra como momento extra (já há 5) ou fica só como nota.
+
+- **Contexto:** o histórico listava só data, status e total. O vendedor não via os itens nem os valores congelados (PH001 ainda tem o biscoito inativo e o arroz a R$ 25,90).
+- **O que foi pedido:** botão "Visualizar pedido" abrindo um painel/modal (não expandir inline nem página própria); `GET /customers/:id/orders/:orderId` com valores congelados; os quatro 404 indistinguíveis; VTU + e2e; screenshots 390×844.
+- **O que a IA fez:** rota + schemas Zod; painel com foco preso, Esc e clique fora; testes no PH001; decisão D23 (painel vs inline vs rota) e A55–A57.
+- **Dúvidas conservadoras:** o 404 deste GET unifica os quatro casos em `Pedido não encontrado` (a listagem continua `Cliente não encontrado`); descrição/EAN vêm do cadastro atual, não de snapshot na linha.
+
 ## Mapa de autoria
 
 Legenda: **Eu escrevi** · **IA gerou, eu revisei/alterei** · **IA gerou, aceitei como veio**

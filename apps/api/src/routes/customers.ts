@@ -1,5 +1,6 @@
 import {
   buildRepeatDraft,
+  lineTotals,
   orderTotals,
   resolvePriceTableId,
   searchCustomerProducts,
@@ -7,12 +8,13 @@ import {
   type OrderLineInput,
   type Product,
 } from '@yandeh/shared'
-import { desc, eq, inArray } from 'drizzle-orm'
+import { asc, desc, eq, inArray } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import type { Db } from '../db/client.js'
 import { pedidos, pedidosItens, produtos, tabelasPrecoItens } from '../db/schema.js'
 import { findCustomerInSellerWallet } from '../http/seller-access.js'
 import {
+  customerOrderDetailSchema,
   customerOrdersResponseSchema,
   customerProductsQuerySchema,
   customerProductsResponseSchema,
@@ -20,6 +22,12 @@ import {
   repeatDraftResponseSchema,
   sellerIdHeaderSchema,
 } from '../http/schemas.js'
+
+/**
+ * GET /customers/:id/orders/:orderId: os quatro 404 (outra carteira, cliente
+ * inexistente, pedido inexistente, pedido de outro cliente) usam o mesmo corpo.
+ */
+const ORDER_DETAIL_NOT_FOUND = { message: 'Pedido não encontrado' } as const
 
 /** Data civil gravada (YYYY-MM-DD). DATE do Postgres chega como string ou Date UTC. */
 function civilDateFromColumn(value: string | Date): string {
@@ -159,6 +167,83 @@ export function registerCustomerRoutes(app: FastifyInstance, database: Db) {
       })),
     )
   })
+
+  app.get<{ Params: { id: string; orderId: string } }>(
+    '/customers/:id/orders/:orderId',
+    async (request, reply) => {
+      const sellerId = sellerIdHeaderSchema.safeParse(request.headers['x-seller-id'])
+      if (!sellerId.success) {
+        return reply.code(400).send({ message: 'Cabeçalho X-Seller-Id é obrigatório' })
+      }
+
+      const access = await findCustomerInSellerWallet(database, sellerId.data, request.params.id)
+      if (!access.ok) {
+        return reply.code(404).send(ORDER_DETAIL_NOT_FOUND)
+      }
+
+      const [order] = await database
+        .select({
+          id: pedidos.id,
+          customerId: pedidos.clienteId,
+          date: pedidos.data,
+          status: pedidos.status,
+        })
+        .from(pedidos)
+        .where(eq(pedidos.id, request.params.orderId))
+        .limit(1)
+
+      if (!order || order.customerId !== access.customer.id) {
+        return reply.code(404).send(ORDER_DETAIL_NOT_FOUND)
+      }
+
+      const itemRows = await database
+        .select({
+          productId: pedidosItens.produtoId,
+          quantity: pedidosItens.quantidade,
+          unitPrice: pedidosItens.precoUnidadeCentavos,
+          discountPercent: pedidosItens.descontoPercentual,
+          description: produtos.descricao,
+          ean: produtos.ean,
+        })
+        .from(pedidosItens)
+        .leftJoin(produtos, eq(produtos.id, pedidosItens.produtoId))
+        .where(eq(pedidosItens.pedidoId, order.id))
+        .orderBy(asc(pedidosItens.produtoId))
+
+      const items = itemRows.map((item) => {
+        const totals = lineTotals({
+          productId: item.productId,
+          quantityUnits: item.quantity,
+          unitPrice: item.unitPrice,
+          discountPercent: item.discountPercent,
+        })
+        return {
+          productId: item.productId,
+          description: item.description ?? 'Produto',
+          ean: item.ean ?? '',
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          discountPercent: item.discountPercent,
+          totals,
+        }
+      })
+
+      return customerOrderDetailSchema.parse({
+        id: order.id,
+        date: civilDateFromColumn(order.date),
+        status: order.status,
+        totals: orderTotals(
+          items.map((item) => ({
+            productId: item.productId,
+            quantityUnits: item.quantity,
+            unitPrice: item.unitPrice,
+            discountPercent: item.discountPercent,
+          })),
+        ),
+        items,
+      })
+    },
+  )
 
   app.post<{ Params: { id: string; orderId: string } }>(
     '/customers/:id/orders/:orderId/repeat',
